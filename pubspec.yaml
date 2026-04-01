@@ -1,0 +1,54 @@
+name: game_center
+description: "Game Center App"
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # 🔥 Firebase (на будущее)
+  firebase_core: ^3.6.0
+  cloud_firestore: ^5.4.4
+  firebase_auth: ^5.3.1
+  firebase_storage: ^12.3.4
+  firebase_database: ^11.1.4
+
+  # 🎮 Flame (для игр)
+  flame: ^1.18.0
+
+  # 🖼️ изображения
+  image_picker: ^1.1.2
+
+  # 💾 сохранение
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/level2_a.png
+    - assets/level2_b.png
+    - assets/level1_a.png
+    - assets/level1_b.png
+    - assets/diff.png
+    - assets/memory.png
+    - assets/math.png
+    - assets/clicker.png
+    - assets/tic.png
+    - assets/sudoku.png
+    - assets/coins.png
+    - assets/win.png
