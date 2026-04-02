@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../../data/levels.dart';
 import '../../features/leaderboard/leaderboard_provider.dart';
-import '../../widgets/game_card.dart';
 import '../../core/services/coin_service.dart';
-import '../../core/services/user_service.dart'; // 🔥 ДОБАВИЛ
+import '../../core/services/user_service.dart';
 
 /// 🎮 ЭКРАНЫ ИГР
 import '../../games/solo/memory/memory_screen.dart';
@@ -12,6 +11,7 @@ import '../../games/solo/math/math_screen.dart';
 import '../../games/solo/clicker/clicker_screen.dart';
 import '../../games/solo/tic_tac_toe/tic_tac_toe_screen.dart';
 import '../../games/solo/sudoku/sudoku_screen.dart';
+import '../../screens/find_diff_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,7 +22,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
 
-  /// 🏆 POPUP РЕЙТИНГА
   void showLeaderboard() {
 
     final provider = LeaderboardProvider();
@@ -53,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(height: 10),
 
-                /// 🔥 ЖИВОЙ РЕЙТИНГ
                 SizedBox(
                   height: 250,
                   child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -62,21 +60,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     builder: (context, snapshot) {
 
-                      /// ⏳ загрузка
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
                           child: CircularProgressIndicator(),
                         );
                       }
 
-                      /// ❌ ошибка
                       if (snapshot.hasError) {
                         return Center(
                           child: Text("Ошибка: ${snapshot.error}"),
                         );
                       }
 
-                      /// 📭 пусто
                       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                         return const Center(
                           child: Text("Нет игроков"),
@@ -116,114 +111,205 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 🔄 ОБНОВЛЕНИЕ ПОСЛЕ ВОЗВРАТА
   Future<void> openGame(Widget screen) async {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => screen),
     );
-    setState(() {}); // обновляем монеты
+    setState(() {});
   }
 
-  /// 🔥 СОЗДАЕМ ПОЛЬЗОВАТЕЛЯ ПРИ ЗАПУСКЕ
   @override
   void initState() {
     super.initState();
-    UserService.getOrCreateUser(); // 🔥 ВОТ ЭТО КЛЮЧЕВОЕ
+    UserService.getOrCreateUser();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
 
-      /// 🔵 APPBAR
-      appBar: AppBar(
-        title: const Text("Game Center"),
-        centerTitle: true,
-        backgroundColor: Colors.blue,
-
-        /// 🏆 ОСТАВИЛИ ТОЛЬКО ОДНУ КНОПКУ
-        leading: IconButton(
-          icon: const Icon(Icons.emoji_events),
-          onPressed: showLeaderboard,
+      /// 🔥 ГРАДИЕНТ ФОН
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF0F172A),
+              Color(0xFF1E293B),
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
         ),
 
-        /// 🪙 монеты + иконки
-        actions: [
+        child: SafeArea(
+          child: Column(
+            children: [
 
-          /// ❌ УДАЛИЛИ ДУБЛИКАТ КНОПКИ
+              /// 🔝 HEADER
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
 
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Text(
-                "${CoinService.getCoins()} 🪙",
-                style: const TextStyle(fontSize: 18),
+                    const Text(
+                      "🎮 GameZone",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    Row(
+                      children: [
+
+                        _topButton(Icons.store, Colors.orange, () {
+                          Navigator.pushNamed(context, "/shop");
+                        }),
+
+                        const SizedBox(width: 8),
+
+                        _topButton(Icons.wifi, Colors.green, () {}),
+
+                        const SizedBox(width: 8),
+
+                        _topButton(Icons.person, Colors.pink, () {}),
+                      ],
+                    )
+
+                  ],
+                ),
               ),
-            ),
+
+              const SizedBox(height: 16),
+
+              /// 🪙 МОНЕТЫ
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E3A8A),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.monetization_on, color: Colors.yellow),
+                      const SizedBox(width: 8),
+                      Text(
+                        "${CoinService.getCoins()} монет",
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              /// 🎮 СЕТКА
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: GridView.count(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.85,
+
+                    children: [
+
+                      _gameCard("Память", "assets/memory.png", Colors.purple,
+                              () => openGame(const MemoryScreen())),
+
+                      _gameCard("Математика", "assets/math.png", Colors.blue,
+                              () => openGame(const MathScreen())),
+
+                      _gameCard("Кликер", "assets/clicker.png", Colors.orange,
+                              () => openGame(const ClickerScreen())),
+
+                      _gameCard("Крестики", "assets/tic.png", Colors.green,
+                              () => openGame(const TicTacToeScreen())),
+
+                      _gameCard("Судоку", "assets/sudoku.png", Colors.teal,
+                              () => openGame(const SudokuScreen())),
+
+                      _gameCard("Найди", "assets/diff.png", Colors.blueGrey,
+                              () => openGame(
+                            FindDiffScreen(level: levels[0]),
+                          )),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.store),
-            onPressed: () {
-              Navigator.pushNamed(context, "/shop");
-            },
-          ),          IconButton(icon: const Icon(Icons.wifi), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.person), onPressed: () {}),
-        ],
+        ),
       ),
+    );
+  }
 
-      /// 🎮 СЕТКА ИГР
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.85,
+  /// 🔥 КНОПКИ СВЕРХУ
+  Widget _topButton(IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 45,
+        height: 45,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: Colors.white),
+      ),
+    );
+  }
 
+  /// 🔥 КАРТОЧКИ С КАРТИНКАМИ
+  Widget _gameCard(
+      String title,
+      String image,
+      Color color,
+      VoidCallback onTap,
+      ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: color, width: 1.5),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
 
-            GameCard(
-              title: "ПАМЯТЬ",
-              image: "assets/memory.png",
-              gradient: const [Colors.blue, Colors.lightBlueAccent],
-              onTap: () => openGame(const MemoryScreen()),
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Image.asset(
+                  image,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
 
-            GameCard(
-              title: "МАТЕМАТИКА",
-              image: "assets/math.png",
-              gradient: const [Colors.green, Colors.lightGreen],
-              onTap: () => openGame(const MathScreen()),
-            ),
+            const SizedBox(height: 8),
 
-            GameCard(
-              title: "КЛИКЕР",
-              image: "assets/clicker.png",
-              gradient: const [Colors.teal, Colors.greenAccent],
-              onTap: () => openGame(const ClickerScreen()),
-            ),
-
-            GameCard(
-              title: "КРЕСТИКИ-НОЛИКИ",
-              image: "assets/tic.png",
-              gradient: const [Colors.orange, Colors.deepOrange],
-              onTap: () => openGame(const TicTacToeScreen()),
-            ),
-
-            GameCard(
-              title: "СУДОКУ",
-              image: "assets/sudoku.png",
-              gradient: const [Colors.blueGrey, Colors.grey],
-              onTap: () => openGame(const SudokuScreen()),
-            ),
-
-            GameCard(
-              title: "Найди отличия",
-              image: "assets/diff.png",
-              gradient: const [Colors.deepPurple, Colors.pinkAccent],
-              onTap: () => Navigator.pushNamed(context, "/diff_start"),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+              ),
             ),
           ],
         ),
