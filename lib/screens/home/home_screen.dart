@@ -163,8 +163,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          IconButton(icon: const Icon(Icons.store), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.wifi), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.store),
+            onPressed: () {
+              Navigator.pushNamed(context, "/shop");
+            },
+          ),          IconButton(icon: const Icon(Icons.wifi), onPressed: () {}),
           IconButton(icon: const Icon(Icons.person), onPressed: () {}),
         ],
       ),

@@ -52,3 +52,7 @@ flutter:
     - assets/sudoku.png
     - assets/coins.png
     - assets/win.png
+    - assets/mask.png
+    - assets/rocket.png
+    - assets/crown.png
+    - assets/palette.png

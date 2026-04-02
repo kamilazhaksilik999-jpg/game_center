@@ -13,6 +13,9 @@ import 'games/solo/tic_tac_toe/tic_tac_toe_screen.dart';
 import 'games/solo/sudoku/sudoku_screen.dart';
 import 'screens/level_select_screen.dart';
 
+/// 🛒 ДОБАВИЛ МАГАЗИН
+import 'screens/shop/shop_screen.dart';
+
 /// 🔥 ДОБАВИЛ FIREBASE
 import 'package:firebase_core/firebase_core.dart';
 
@@ -20,7 +23,6 @@ import 'package:firebase_core/firebase_core.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  /// 🔥 ТВОЙ CONFIG (Я ПОДСТАВИЛ РЕАЛЬНЫЕ ДАННЫЕ)
   await Firebase.initializeApp(
     options: const FirebaseOptions(
       apiKey: "AIzaSyABnMg83_sAmB5MqqSVFqTEKmxXKJh072s",
@@ -49,8 +51,7 @@ class MyApp extends StatelessWidget {
         "/": (context) => const HomeScreen(),
 
         /// 🧭 меню
-        "/shop": (context) =>
-        const Scaffold(body: Center(child: Text("Shop"))),
+        "/shop": (context) => const ShopScreen(), // ✅ РАБОЧИЙ МАГАЗИН
         "/lobby": (context) =>
         const Scaffold(body: Center(child: Text("Lobby"))),
         "/profile": (context) =>
