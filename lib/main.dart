@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 /// 🏠 главный экран
 import 'screens/home/home_screen.dart';
 import 'screens/diff_start_screen.dart';
+
 /// 🪙 СЕРВИС МОНЕТ
 import 'core/services/coin_service.dart';
 
@@ -13,11 +14,24 @@ import 'games/solo/clicker/clicker_screen.dart';
 import 'games/solo/tic_tac_toe/tic_tac_toe_screen.dart';
 import 'games/solo/sudoku/sudoku_screen.dart';
 import 'screens/level_select_screen.dart';
+
+/// 🔥 ДОБАВИЛ FIREBASE
+import 'package:firebase_core/firebase_core.dart';
+
+/// 🔥 ДОБАВИЛ MAIN
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  /// 🔥 загружаем монеты
-  await CoinService.load();
+  /// 🔥 ТВОЙ CONFIG (Я ПОДСТАВИЛ РЕАЛЬНЫЕ ДАННЫЕ)
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyABnMg83_sAmB5MqqSVFqTEKmxXKJh072s",
+      appId: "1:984380938437:web:925a2e63c5f8f0005978ac",
+      messagingSenderId: "984380938437",
+      projectId: "game-center-b4d5c",
+      storageBucket: "game-center-b4d5c.firebasestorage.app",
+    ),
+  );
 
   runApp(const MyApp());
 }
