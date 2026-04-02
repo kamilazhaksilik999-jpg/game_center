@@ -6,8 +6,6 @@ import 'screens/diff_start_screen.dart';
 
 /// 🪙 СЕРВИС МОНЕТ
 import 'core/services/coin_service.dart';
-
-/// 🎮 ИГРЫ
 import 'games/solo/memory/memory_screen.dart';
 import 'games/solo/math/math_screen.dart';
 import 'games/solo/clicker/clicker_screen.dart';
