@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:game_center/screens/lobby/lobby_screen.dart';
 import '../../data/levels.dart';
 import '../../features/leaderboard/leaderboard_provider.dart';
 import '../../core/services/coin_service.dart';
 import '../../core/services/user_service.dart';
-import '../lobby/lobby_screen.dart';
-import 'package:game_center/screens/lobby/online/online_games_screen.dart';
 /// 🎮 ЭКРАНЫ ИГР
 import '../../games/solo/memory/memory_screen.dart';
 import '../../games/solo/math/math_screen.dart';
@@ -175,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         _topButton(Icons.wifi, Colors.green, () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const OnlineGamesScreen()),
+                            MaterialPageRoute(builder: (_) =>  LobbyScreen()),
                           );
                         }),
 
