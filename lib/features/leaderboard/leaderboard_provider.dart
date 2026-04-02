@@ -1,10 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'leaderboard_service.dart';
 class LeaderboardProvider {
-
-
-
-
   final LeaderboardService service =
   LeaderboardService();
 
