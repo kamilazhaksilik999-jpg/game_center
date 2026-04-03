@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'games/battleship_screen.dart';
+import 'games/mini_football_screen.dart';
+import 'games/rope_pull_screen.dart';
 class OnlineGamesScreen extends StatelessWidget {
   final String? selectedMode;
   const OnlineGamesScreen({super.key, this.selectedMode});
@@ -27,11 +29,21 @@ class OnlineGamesScreen extends StatelessWidget {
               context,
               "Морской бой",
               Colors.teal,
-              const BattleshipScreen(isAi: true),
+              const BattleshipScreen(isAi: true), // запускаем ИИ-режим
             ),
-            _gameCard(context, "Мини-футбол", Colors.green, null),
+            _gameCard(
+              context,
+              "Мини-футбол",
+              Colors.green,
+              const MiniFootballScreen(),
+            ),
             _gameCard(context, "Танк", Colors.orange, null),
-            _gameCard(context, "Перетяни канат", Colors.redAccent, null),
+            _gameCard(
+              context,
+              "Перетяни канат",
+              Colors.redAccent,
+              const RopePullScreen(),
+            ),
           ],
         ),
       ),
