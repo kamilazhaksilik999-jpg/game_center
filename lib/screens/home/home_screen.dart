@@ -23,7 +23,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
 
   void showLeaderboard() {
-
     final provider = LeaderboardProvider();
 
     showDialog(
@@ -41,7 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-
                 const Text(
                   "🏆 Мировой рейтинг",
                   style: TextStyle(
@@ -49,33 +47,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
                 SizedBox(
                   height: 250,
                   child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-
                     stream: provider.getLeaderboard(),
-
                     builder: (context, snapshot) {
-
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
+                        return const Center(child: CircularProgressIndicator());
                       }
-
                       if (snapshot.hasError) {
-                        return Center(
-                          child: Text("Ошибка: ${snapshot.error}"),
-                        );
+                        return Center(child: Text("Ошибка: ${snapshot.error}"));
                       }
-
                       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return const Center(
-                          child: Text("Нет игроков"),
-                        );
+                        return const Center(child: Text("Нет игроков"));
                       }
 
                       final players = snapshot.data!.docs;
@@ -83,26 +68,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       return ListView.builder(
                         itemCount: players.length,
                         itemBuilder: (context, index) {
-
                           final data = players[index].data();
-
                           final name = data['name'] ?? 'Player';
                           final rating = data['rating'] ?? 0;
-
                           return ListTile(
-                            title: Text(
-                              "${index + 1}. $name - $rating",
-                            ),
+                            title: Text("${index + 1}. $name - $rating"),
                           );
-
                         },
                       );
-
                     },
-
                   ),
                 ),
-
               ],
             ),
           ),
@@ -128,8 +104,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
-      /// 🔥 ГРАДИЕНТ ФОН
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -141,7 +115,6 @@ class _HomeScreenState extends State<HomeScreen> {
             end: Alignment.bottomCenter,
           ),
         ),
-
         child: SafeArea(
           child: Column(
             children: [
@@ -152,7 +125,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-
                     const Text(
                       "🎮 GameZone",
                       style: TextStyle(
@@ -161,29 +133,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-
                     Row(
                       children: [
-
                         _topButton(Icons.store, Colors.orange, () {
                           Navigator.pushNamed(context, "/shop");
                         }),
-
                         const SizedBox(width: 8),
-
                         _topButton(Icons.wifi, Colors.green, () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) =>  LobbyScreen()),
+                            MaterialPageRoute(builder: (_) => LobbyScreen()),
                           );
                         }),
-
                         const SizedBox(width: 8),
 
-                        _topButton(Icons.person, Colors.pink, () {}),
+                        // ✅ ПРОФИЛЬ — ТЕПЕРЬ РАБОЧИЙ
+                        _topButton(Icons.person, Colors.pink, () async {
+                          await Navigator.pushNamed(context, "/profile");
+                          setState(() {}); // обновляем монеты после возврата
+                        }),
                       ],
                     )
-
                   ],
                 ),
               ),
@@ -223,28 +193,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
                     childAspectRatio: 0.85,
-
                     children: [
-
                       _gameCard("Память", "assets/memory.png", Colors.purple,
                               () => openGame(const MemoryScreen())),
-
                       _gameCard("Математика", "assets/math.png", Colors.blue,
                               () => openGame(const MathScreen())),
-
                       _gameCard("Кликер", "assets/clicker.png", Colors.orange,
                               () => openGame(const ClickerScreen())),
-
                       _gameCard("Крестики", "assets/tic.png", Colors.green,
                               () => openGame(const TicTacToeScreen())),
-
                       _gameCard("Судоку", "assets/sudoku.png", Colors.teal,
                               () => openGame(const SudokuScreen())),
-
                       _gameCard("Найди", "assets/diff.png", Colors.blueGrey,
-                              () => openGame(
-                            FindDiffScreen(level: levels[0]),
-                          )),
+                              () => openGame(FindDiffScreen(level: levels[0]))),
                     ],
                   ),
                 ),
@@ -256,7 +217,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 🔥 КНОПКИ СВЕРХУ
   Widget _topButton(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -272,7 +232,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 🔥 КАРТОЧКИ С КАРТИНКАМИ
   Widget _gameCard(
       String title,
       String image,
@@ -290,7 +249,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-
             Container(
               width: 60,
               height: 60,
@@ -300,21 +258,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(6),
-                child: Image.asset(
-                  image,
-                  fit: BoxFit.contain,
-                ),
+                child: Image.asset(image, fit: BoxFit.contain),
               ),
             ),
-
             const SizedBox(height: 8),
-
             Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 12),
             ),
           ],
         ),
