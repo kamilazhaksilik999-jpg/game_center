@@ -35,22 +35,22 @@ class _ShopScreenState extends State<ShopScreen> {
         name: "Новая тема",
         desc: "Темная галактика",
         price: 300,
-        image: "assets/shop/palette.png"),
+        image: "assets/palette.png"),
     ShopItem(
         name: "VIP статус",
         desc: "7 дней",
         price: 500,
-        image: "assets/shop/crown.png"),
+        image: "assets/crown.png"),
     ShopItem(
         name: "Буст XP x2",
         desc: "24 часа",
         price: 200,
-        image: "assets/shop/rocket.png"),
+        image: "assets/rocket.png"),
     ShopItem(
         name: "Аватар рамка",
         desc: "Золотая",
         price: 150,
-        image: "assets/shop/mask.png"),
+        image: "assets/mask.png"),
   ];
 
   @override
@@ -155,7 +155,7 @@ class _ShopScreenState extends State<ShopScreen> {
                         child: Center(
                           child: Image.asset(
                             item.image,
-                            height: 25, // 🔥 почти половина
+                            height: 85, // 🔥 почти половина
                             errorBuilder: (context, error, stackTrace) {
                               return const Icon(
                                 Icons.image_not_supported,
