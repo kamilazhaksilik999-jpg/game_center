@@ -155,7 +155,7 @@ class _ShopScreenState extends State<ShopScreen> {
                         child: Center(
                           child: Image.asset(
                             item.image,
-                            height: 85, // 🔥 почти половина
+                            height: 95, // 🔥 почти половина
                             errorBuilder: (context, error, stackTrace) {
                               return const Icon(
                                 Icons.image_not_supported,
