@@ -5,6 +5,7 @@ import '../../features/leaderboard/leaderboard_provider.dart';
 import '../../core/services/coin_service.dart';
 import '../../core/services/user_service.dart';
 
+/// 🎮 ЭКРАНЫ ИГР
 import '../../games/solo/memory/memory_screen.dart';
 import '../../games/solo/math/math_screen.dart';
 import '../../games/solo/clicker/clicker_screen.dart';
@@ -21,7 +22,94 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
 
-  final provider = LeaderboardProvider();
+  void showLeaderboard() {
+
+    final provider = LeaderboardProvider();
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (_) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+
+                const Text(
+                  "🏆 Мировой рейтинг",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                SizedBox(
+                  height: 250,
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+
+                    stream: provider.getLeaderboard(),
+
+                    builder: (context, snapshot) {
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Text("Ошибка: ${snapshot.error}"),
+                        );
+                      }
+
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return const Center(
+                          child: Text("Нет игроков"),
+                        );
+                      }
+
+                      final players = snapshot.data!.docs;
+
+                      return ListView.builder(
+                        itemCount: players.length,
+                        itemBuilder: (context, index) {
+
+                          final data = players[index].data();
+
+                          final name = data['name'] ?? 'Player';
+                          final rating = data['rating'] ?? 0;
+
+                          return ListTile(
+                            title: Text(
+                              "${index + 1}. $name - $rating",
+                            ),
+                          );
+
+                        },
+                      );
+
+                    },
+
+                  ),
+                ),
+
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> openGame(Widget screen) async {
     await Navigator.push(
@@ -40,6 +128,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+
+      /// 🔥 ГРАДИЕНТ ФОН
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -88,6 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         _topButton(Icons.person, Colors.pink, () {}),
                       ],
                     )
+
                   ],
                 ),
               ),
@@ -118,53 +209,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 20),
 
-              /// 🎮 СЕТКА + РЕЙТИНГ
+              /// 🎮 СЕТКА
               Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: GridView.count(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.85,
+
                     children: [
 
-                      /// 🎮 ИГРЫ
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: GridView.count(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.85,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          children: [
+                      _gameCard("Память", "assets/memory.png", Colors.purple,
+                              () => openGame(const MemoryScreen())),
 
-                            _gameCard("Память", "assets/memory.png", Colors.purple,
-                                    () => openGame(const MemoryScreen())),
+                      _gameCard("Математика", "assets/math.png", Colors.blue,
+                              () => openGame(const MathScreen())),
 
-                            _gameCard("Математика", "assets/math.png", Colors.blue,
-                                    () => openGame(const MathScreen())),
+                      _gameCard("Кликер", "assets/clicker.png", Colors.orange,
+                              () => openGame(const ClickerScreen())),
 
-                            _gameCard("Кликер", "assets/clicker.png", Colors.orange,
-                                    () => openGame(const ClickerScreen())),
+                      _gameCard("Крестики", "assets/tic.png", Colors.green,
+                              () => openGame(const TicTacToeScreen())),
 
-                            _gameCard("Крестики", "assets/tic.png", Colors.green,
-                                    () => openGame(const TicTacToeScreen())),
+                      _gameCard("Судоку", "assets/sudoku.png", Colors.teal,
+                              () => openGame(const SudokuScreen())),
 
-                            _gameCard("Судоку", "assets/sudoku.png", Colors.teal,
-                                    () => openGame(const SudokuScreen())),
-
-                            _gameCard("Найди", "assets/diff.png", Colors.blueGrey,
-                                    () => openGame(
-                                  FindDiffScreen(level: levels[0]),
-                                )),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      /// 🌍 РЕЙТИНГ
-                      _leaderboard(),
-
-                      const SizedBox(height: 20),
+                      _gameCard("Найди", "assets/diff.png", Colors.blueGrey,
+                              () => openGame(
+                            FindDiffScreen(level: levels[0]),
+                          )),
                     ],
                   ),
                 ),
@@ -176,135 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 🔥 РЕЙТИНГ (КРАСИВЫЙ)
-  Widget _leaderboard() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.blueAccent),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-
-          /// HEADER
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "🌍 Мировой рейтинг",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text("ТОП 100"),
-              )
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: provider.getLeaderboard(),
-            builder: (context, snapshot) {
-
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final players = snapshot.data!.docs;
-
-              return Column(
-                children: List.generate(players.length, (index) {
-
-                  final data = players[index].data();
-                  final name = data['name'] ?? 'Player';
-                  final rating = data['rating'] ?? 0;
-
-                  Color color;
-                  if (index == 0) color = Colors.amber;
-                  else if (index == 1) color = Colors.grey;
-                  else if (index == 2) color = Colors.deepOrange;
-                  else color = Colors.blueGrey;
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-
-                        /// место
-                        Container(
-                          width: 28,
-                          height: 28,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            "${index + 1}",
-                            style: const TextStyle(color: Colors.black),
-                          ),
-                        ),
-
-                        const SizedBox(width: 10),
-
-                        /// аватар
-                        CircleAvatar(
-                          backgroundColor: Colors.blue,
-                          child: Text(
-                            name.toString().substring(0, 2).toUpperCase(),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-
-                        const SizedBox(width: 10),
-
-                        /// имя
-                        Expanded(
-                          child: Text(
-                            name,
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-
-                        /// очки
-                        Text(
-                          "$rating",
-                          style: const TextStyle(
-                            color: Colors.amber,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
+  /// 🔥 КНОПКИ СВЕРХУ
   Widget _topButton(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -320,6 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// 🔥 КАРТОЧКИ С КАРТИНКАМИ
   Widget _gameCard(
       String title,
       String image,

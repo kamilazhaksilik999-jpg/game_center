@@ -18,6 +18,7 @@ import 'screens/shop/shop_screen.dart';
 
 /// 🔥 ДОБАВИЛ FIREBASE
 import 'package:firebase_core/firebase_core.dart';
+import 'screens/profile/profile_screen.dart';
 
 /// 🔥 ДОБАВИЛ MAIN
 void main() async {
@@ -54,8 +55,7 @@ class MyApp extends StatelessWidget {
         "/shop": (context) => const ShopScreen(), // ✅ РАБОЧИЙ МАГАЗИН
         "/lobby": (context) =>
         const Scaffold(body: Center(child: Text("Lobby"))),
-        "/profile": (context) =>
-        const Scaffold(body: Center(child: Text("Profile"))),
+        "/profile": (context) => const ProfileScreen(),
 
         /// 🎮 ИГРЫ
         "/diff_start": (context) => const DiffStartScreen(),
