@@ -22,20 +22,29 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
 
+  /// 🔥 ФЕЙКОВЫЕ ИГРОКИ (если нет базы)
+  final List<Map<String, dynamic>> demoPlayers = [
+    {"name": "Kamila", "rating": 1500},
+    {"name": "ProGamer", "rating": 1400},
+    {"name": "NoobMaster", "rating": 1200},
+    {"name": "DarkKnight", "rating": 1100},
+    {"name": "Ghost", "rating": 1000},
+  ];
+
   void showLeaderboard() {
 
     final provider = LeaderboardProvider();
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withOpacity(0.6),
       builder: (_) {
         return Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
+              color: const Color(0xFF1E293B),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
@@ -45,7 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Text(
                   "🏆 Мировой рейтинг",
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 20,
+                    color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -60,21 +70,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     builder: (context, snapshot) {
 
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Text("Ошибка: ${snapshot.error}"),
-                        );
-                      }
-
+                      /// 🔥 ЕСЛИ НЕТ ДАННЫХ → ПОКАЗЫВАЕМ ФЕЙКОВЫХ
                       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return const Center(
-                          child: Text("Нет игроков"),
+                        return ListView.builder(
+                          itemCount: demoPlayers.length,
+                          itemBuilder: (context, index) {
+                            final player = demoPlayers[index];
+
+                            return ListTile(
+                              leading: Text(
+                                "${index + 1}",
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              title: Text(
+                                player['name'],
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              trailing: Text(
+                                "${player['rating']}",
+                                style: const TextStyle(color: Colors.yellow),
+                              ),
+                            );
+                          },
                         );
                       }
 
@@ -90,8 +107,17 @@ class _HomeScreenState extends State<HomeScreen> {
                           final rating = data['rating'] ?? 0;
 
                           return ListTile(
+                            leading: Text(
+                              "${index + 1}",
+                              style: const TextStyle(color: Colors.white),
+                            ),
                             title: Text(
-                              "${index + 1}. $name - $rating",
+                              name,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            trailing: Text(
+                              "$rating",
+                              style: const TextStyle(color: Colors.greenAccent),
                             ),
                           );
 
@@ -164,6 +190,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     Row(
                       children: [
+
+                        _topButton(Icons.emoji_events, Colors.amber, showLeaderboard), // 🏆
+
+                        const SizedBox(width: 8),
 
                         _topButton(Icons.store, Colors.orange, () {
                           Navigator.pushNamed(context, "/shop");
@@ -251,7 +281,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 🔥 КНОПКИ СВЕРХУ
   Widget _topButton(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -267,7 +296,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 🔥 КАРТОЧКИ С КАРТИНКАМИ
   Widget _gameCard(
       String title,
       String image,
