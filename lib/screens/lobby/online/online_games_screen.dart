@@ -1,98 +1,65 @@
 import 'package:flutter/material.dart';
-import 'room_create_screen.dart';
-import 'room_join_screen.dart';
-
+import 'games/battleship_screen.dart';
 class OnlineGamesScreen extends StatelessWidget {
-  final String? selectedMode; // <- добавили параметр
-
-  const OnlineGamesScreen({super.key, this.selectedMode}); // <- конструктор с параметром
+  final String? selectedMode;
+  const OnlineGamesScreen({super.key, this.selectedMode});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: const Color(0xFF1E293B),
         title: Text(
-          selectedMode != null
-              ? "Онлайн: $selectedMode"
-              : "Онлайн игры",
+          selectedMode != null ? "Онлайн: $selectedMode" : "Онлайн игры",
+          style: const TextStyle(color: Colors.white),
         ),
       ),
+      backgroundColor: const Color(0xFF0F172A),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: GridView.count(
           crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 3,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 1,
           children: [
-            _gameCard(context, "Морской бой", Colors.teal),
-            _gameCard(context, "Мини-футбол", Colors.green),
-            _gameCard(context, "Танк", Colors.orange),
-            _gameCard(context, "Перетяни канат", Colors.redAccent),
+            _gameCard(
+              context,
+              "Морской бой",
+              Colors.teal,
+              const BattleshipScreen(isAi: true),
+            ),
+            _gameCard(context, "Мини-футбол", Colors.green, null),
+            _gameCard(context, "Танк", Colors.orange, null),
+            _gameCard(context, "Перетяни канат", Colors.redAccent, null),
           ],
         ),
       ),
     );
   }
 
-  Widget _gameCard(BuildContext context, String title, Color color) {
+  Widget _gameCard(BuildContext context, String title, Color color, Widget? screen) {
     return GestureDetector(
       onTap: () {
-        showModalBottomSheet(
-          context: context,
-          builder: (_) => Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-
-                // 🔵 СОЗДАТЬ КОМНАТУ
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RoomCreateScreen(gameName: title),
-                      ),
-                    );
-                  },
-                  child: const Text("Создать комнату"),
-                ),
-
-                const SizedBox(height: 10),
-
-                // 🟢 ПРИСОЕДИНИТЬСЯ
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RoomJoinScreen(gameName: title),
-                      ),
-                    );
-                  },
-                  child: const Text("Присоединиться"),
-                ),
-              ],
-            ),
-          ),
-        );
+        if (screen != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => screen),
+          );
+        }
       },
       child: Container(
-        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color, width: 2),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color, width: 3),
+          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6, offset: Offset(2,2))],
         ),
         child: Center(
           child: Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ),
       ),
