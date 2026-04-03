@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 // файлы из подпапки online
 import 'online/online_games_screen.dart';
 import 'online/room_create_screen.dart';
-import 'online/room_join_screen.dart';
-
 class LobbyScreen extends StatelessWidget {
   const LobbyScreen({super.key});
 

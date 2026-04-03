@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'room_create_screen.dart';
+import 'room_join_screen.dart';
 
 class OnlineGamesScreen extends StatelessWidget {
   final String? selectedMode; // <- добавили параметр
@@ -37,10 +38,43 @@ class OnlineGamesScreen extends StatelessWidget {
   Widget _gameCard(BuildContext context, String title, Color color) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => RoomCreateScreen(gameName: title),
+        showModalBottomSheet(
+          context: context,
+          builder: (_) => Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+
+                // 🔵 СОЗДАТЬ КОМНАТУ
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RoomCreateScreen(gameName: title),
+                      ),
+                    );
+                  },
+                  child: const Text("Создать комнату"),
+                ),
+
+                const SizedBox(height: 10),
+
+                // 🟢 ПРИСОЕДИНИТЬСЯ
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RoomJoinScreen(gameName: title),
+                      ),
+                    );
+                  },
+                  child: const Text("Присоединиться"),
+                ),
+              ],
+            ),
           ),
         );
       },
