@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:game_center/screens/lobby/lobby_screen.dart';
 import '../../data/levels.dart';
 import '../../features/leaderboard/leaderboard_provider.dart';
 import '../../core/services/coin_service.dart';
 import '../../core/services/user_service.dart';
+
 /// 🎮 ЭКРАНЫ ИГР
 import '../../games/solo/memory/memory_screen.dart';
 import '../../games/solo/math/math_screen.dart';
@@ -22,45 +22,77 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
 
+  /// 🔥 ФЕЙКОВЫЕ ИГРОКИ (если нет базы)
+  final List<Map<String, dynamic>> demoPlayers = [
+    {"name": "Kamila", "rating": 1500},
+    {"name": "ProGamer", "rating": 1400},
+    {"name": "NoobMaster", "rating": 1200},
+    {"name": "DarkKnight", "rating": 1100},
+    {"name": "Ghost", "rating": 1000},
+  ];
+
   void showLeaderboard() {
+
     final provider = LeaderboardProvider();
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withOpacity(0.6),
       builder: (_) {
         return Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
+              color: const Color(0xFF1E293B),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+
                 const Text(
                   "🏆 Мировой рейтинг",
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 20,
+                    color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: 10),
+
                 SizedBox(
                   height: 250,
                   child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+
                     stream: provider.getLeaderboard(),
+
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError) {
-                        return Center(child: Text("Ошибка: ${snapshot.error}"));
-                      }
+
+                      /// 🔥 ЕСЛИ НЕТ ДАННЫХ → ПОКАЗЫВАЕМ ФЕЙКОВЫХ
                       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return const Center(child: Text("Нет игроков"));
+                        return ListView.builder(
+                          itemCount: demoPlayers.length,
+                          itemBuilder: (context, index) {
+                            final player = demoPlayers[index];
+
+                            return ListTile(
+                              leading: Text(
+                                "${index + 1}",
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              title: Text(
+                                player['name'],
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              trailing: Text(
+                                "${player['rating']}",
+                                style: const TextStyle(color: Colors.yellow),
+                              ),
+                            );
+                          },
+                        );
                       }
 
                       final players = snapshot.data!.docs;
@@ -68,17 +100,35 @@ class _HomeScreenState extends State<HomeScreen> {
                       return ListView.builder(
                         itemCount: players.length,
                         itemBuilder: (context, index) {
+
                           final data = players[index].data();
+
                           final name = data['name'] ?? 'Player';
                           final rating = data['rating'] ?? 0;
+
                           return ListTile(
-                            title: Text("${index + 1}. $name - $rating"),
+                            leading: Text(
+                              "${index + 1}",
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            title: Text(
+                              name,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            trailing: Text(
+                              "$rating",
+                              style: const TextStyle(color: Colors.greenAccent),
+                            ),
                           );
+
                         },
                       );
+
                     },
+
                   ),
                 ),
+
               ],
             ),
           ),
@@ -104,6 +154,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+
+      /// 🔥 ГРАДИЕНТ ФОН
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -115,6 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
             end: Alignment.bottomCenter,
           ),
         ),
+
         child: SafeArea(
           child: Column(
             children: [
@@ -125,6 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+
                     const Text(
                       "🎮 GameZone",
                       style: TextStyle(
@@ -133,27 +187,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+
                     Row(
                       children: [
+
+                        _topButton(Icons.emoji_events, Colors.amber, showLeaderboard), // 🏆
+
+                        const SizedBox(width: 8),
+
                         _topButton(Icons.store, Colors.orange, () {
                           Navigator.pushNamed(context, "/shop");
                         }),
-                        const SizedBox(width: 8),
-                        _topButton(Icons.wifi, Colors.green, () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => LobbyScreen()),
-                          );
-                        }),
+
                         const SizedBox(width: 8),
 
-                        // ✅ ПРОФИЛЬ — ТЕПЕРЬ РАБОЧИЙ
-                        _topButton(Icons.person, Colors.pink, () async {
-                          await Navigator.pushNamed(context, "/profile");
-                          setState(() {}); // обновляем монеты после возврата
-                        }),
+                        _topButton(Icons.wifi, Colors.green, () {}),
+
+                        const SizedBox(width: 8),
+
+                        _topButton(Icons.person, Colors.pink, () {}),
                       ],
                     )
+
                   ],
                 ),
               ),
@@ -193,19 +248,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
                     childAspectRatio: 0.85,
+
                     children: [
+
                       _gameCard("Память", "assets/memory.png", Colors.purple,
                               () => openGame(const MemoryScreen())),
+
                       _gameCard("Математика", "assets/math.png", Colors.blue,
                               () => openGame(const MathScreen())),
+
                       _gameCard("Кликер", "assets/clicker.png", Colors.orange,
                               () => openGame(const ClickerScreen())),
+
                       _gameCard("Крестики", "assets/tic.png", Colors.green,
                               () => openGame(const TicTacToeScreen())),
+
                       _gameCard("Судоку", "assets/sudoku.png", Colors.teal,
                               () => openGame(const SudokuScreen())),
+
                       _gameCard("Найди", "assets/diff.png", Colors.blueGrey,
-                              () => openGame(FindDiffScreen(level: levels[0]))),
+                              () => openGame(
+                            FindDiffScreen(level: levels[0]),
+                          )),
                     ],
                   ),
                 ),
@@ -249,6 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+
             Container(
               width: 60,
               height: 60,
@@ -258,13 +323,21 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(6),
-                child: Image.asset(image, fit: BoxFit.contain),
+                child: Image.asset(
+                  image,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
+
             const SizedBox(height: 8),
+
             Text(
               title,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+              ),
             ),
           ],
         ),
