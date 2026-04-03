@@ -316,7 +316,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final currentIndex = _rankOrder.indexOf(currentRank);
 
     if (currentIndex >= _rankOrder.length - 1) {
-      _showSnack('Ты уже на максимальном ранге! 👑');
+      _showSnack('Ты и так на максимальном ранге! 👑');
       return;
     }
 
