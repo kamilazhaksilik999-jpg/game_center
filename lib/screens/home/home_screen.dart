@@ -13,6 +13,8 @@ import '../../games/solo/tic_tac_toe/tic_tac_toe_screen.dart';
 import '../../games/solo/sudoku/sudoku_screen.dart';
 import '../../screens/find_diff_screen.dart';
 
+/// 📄 НОВЫЕ ЭКРАНЫ
+import '../profile/profile_screen.dart'; import '../lobby/lobby_screen.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -201,11 +203,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         const SizedBox(width: 8),
 
-                        _topButton(Icons.wifi, Colors.green, () {}),
+                        _topButton(Icons.wifi, Colors.green, () {
+                          // ✅ Переход на локальные игры
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const LobbyScreen()),
+                          );
+                        }),
 
                         const SizedBox(width: 8),
 
-                        _topButton(Icons.person, Colors.pink, () {}),
+                        _topButton(Icons.person, Colors.pink, () {
+                          // ✅ Переход на профиль
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                          );
+                        }),
                       ],
                     )
 
