@@ -3,8 +3,22 @@ import 'dart:math';
 import '../../../core/services/coin_service.dart';
 import '../../../widgets/win_dialog.dart';
 
-void win(BuildContext context) {
+// 🔥 ДОБАВИЛ
+import '../../../core/services/user_service.dart';
+import '../../../features/leaderboard/leaderboard_provider.dart';
+
+void win(BuildContext context) async { // 🔥 async
   CoinService.addCoins(10);
+
+  // 👤 создаём / получаем пользователя
+  final userId = await UserService.getOrCreateUser();
+
+  // 🏆 обновляем рейтинг
+  await LeaderboardProvider().updateAfterMatch(
+    userId: userId,
+    win: true,
+  );
+
   showWinDialog(context);
 }
 
@@ -77,7 +91,7 @@ class _ClickerScreenState extends State<ClickerScreen> {
       body: Column(
         children: [
 
-          /// 🔢 СЧЁТЧИК (ТОЧНО ВИДЕН)
+          /// 🔢 СЧЁТЧИК
           const SizedBox(height: 20),
 
           Text(
@@ -106,14 +120,14 @@ class _ClickerScreenState extends State<ClickerScreen> {
                 alignment: Alignment.center,
                 children: [
 
-                  /// 🔘 КНОПКА (ПО ЦЕНТРУ)
+                  /// 🔘 КНОПКА
                   GestureDetector(
                     onTap: onTap,
                     child: AnimatedScale(
                       scale: scale,
                       duration: const Duration(milliseconds: 100),
                       child: Image.asset(
-                        "assets/coins.png", // 👉 твоя картинка
+                        "assets/coins.png",
                         width: 200,
                       ),
                     ),

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../features/leaderboard/leaderboard_provider.dart';
 import '../../widgets/game_card.dart';
 import '../../core/services/coin_service.dart';
+import '../../core/services/user_service.dart';
 
 /// 🎮 ЭКРАНЫ ИГР
 import '../../games/solo/memory/memory_screen.dart';
@@ -21,32 +24,67 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 🏆 POPUP РЕЙТИНГА
   void showLeaderboard() {
+    final provider = LeaderboardProvider();
+
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5), // ✅ NEW API
       builder: (_) {
         return Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
+              color: Colors.white.withValues(alpha: 0.95), // ✅ NEW API
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text(
+              children: [
+                const Text(
                   "🏆 Мировой рейтинг",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 10),
-                ListTile(title: Text("1. Player1 - 1200")),
-                ListTile(title: Text("2. Player2 - 1000")),
-                ListTile(title: Text("3. Player3 - 800")),
+                const SizedBox(height: 10),
+
+                /// 🔥 ЖИВОЙ РЕЙТИНГ
+                SizedBox(
+                  height: 250,
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: provider.getLeaderboard(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return Center(child: Text("Ошибка: ${snapshot.error}"));
+                      }
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return const Center(child: Text("Нет игроков"));
+                      }
+
+                      final players = snapshot.data!.docs;
+
+                      return ListView.builder(
+                        itemCount: players.length,
+                        itemBuilder: (context, index) {
+                          final data = players[index].data();
+                          final name = data['name'] ?? 'Player';
+                          final rating = data['rating'] ?? 0;
+
+                          return ListTile(
+                            leading: Text("${index + 1}"),
+                            title: Text(name),
+                            trailing: Text("$rating 🏆"),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
           ),
@@ -64,6 +102,13 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {}); // обновляем монеты
   }
 
+  /// 🔥 СОЗДАЕМ ПОЛЬЗОВАТЕЛЯ ПРИ ЗАПУСКЕ
+  @override
+  void initState() {
+    super.initState();
+    UserService.getOrCreateUser();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,13 +120,11 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         backgroundColor: Colors.blue,
 
-        /// 🏆 рейтинг
         leading: IconButton(
           icon: const Icon(Icons.emoji_events),
           onPressed: showLeaderboard,
         ),
 
-        /// 🪙 монеты + иконки
         actions: [
           Center(
             child: Padding(
@@ -92,9 +135,23 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          IconButton(icon: const Icon(Icons.store), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.wifi), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.person), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.store),
+            onPressed: () => Navigator.pushNamed(context, "/shop"),
+          ),
+          IconButton(
+            icon: const Icon(Icons.wifi),
+            onPressed: () {},
+          ),
+
+          /// 👤 ПРОФИЛЬ
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () async {
+              await Navigator.pushNamed(context, "/profile");
+              setState(() {});
+            },
+          ),
         ],
       ),
 
@@ -106,44 +163,37 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
           childAspectRatio: 0.85,
-
           children: [
-
             GameCard(
               title: "ПАМЯТЬ",
               image: "assets/memory.png",
               gradient: const [Colors.blue, Colors.lightBlueAccent],
               onTap: () => openGame(const MemoryScreen()),
             ),
-
             GameCard(
               title: "МАТЕМАТИКА",
               image: "assets/math.png",
               gradient: const [Colors.green, Colors.lightGreen],
               onTap: () => openGame(const MathScreen()),
             ),
-
             GameCard(
               title: "КЛИКЕР",
               image: "assets/clicker.png",
               gradient: const [Colors.teal, Colors.greenAccent],
               onTap: () => openGame(const ClickerScreen()),
             ),
-
             GameCard(
               title: "КРЕСТИКИ-НОЛИКИ",
               image: "assets/tic.png",
               gradient: const [Colors.orange, Colors.deepOrange],
               onTap: () => openGame(const TicTacToeScreen()),
             ),
-
             GameCard(
               title: "СУДОКУ",
               image: "assets/sudoku.png",
               gradient: const [Colors.blueGrey, Colors.grey],
               onTap: () => openGame(const SudokuScreen()),
             ),
-
             GameCard(
               title: "Найди отличия",
               image: "assets/diff.png",
