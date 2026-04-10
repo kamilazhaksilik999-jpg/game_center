@@ -519,7 +519,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
                   color: _segments[i].color,
                 ),
                 child: Align(
-                  alignment: const Alignment(0.2, -1), // 👉 сдвиг вправо
+                  alignment: const Alignment(0.2, -1),
                   child: Padding(
                     padding: const EdgeInsets.only(top: 28),
                     child: Transform.rotate(
