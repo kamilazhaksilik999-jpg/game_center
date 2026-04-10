@@ -12,6 +12,7 @@ import 'games/solo/clicker/clicker_screen.dart';
 import 'games/solo/tic_tac_toe/tic_tac_toe_screen.dart';
 import 'games/solo/sudoku/sudoku_screen.dart';
 import 'screens/level_select_screen.dart';
+import 'screens/spin_wheel_screen.dart';
 
 /// 🛒 ДОБАВИЛ МАГАЗИН
 import 'screens/shop/shop_screen.dart';
@@ -19,6 +20,7 @@ import 'screens/shop/shop_screen.dart';
 /// 🔥 ДОБАВИЛ FIREBASE
 import 'package:firebase_core/firebase_core.dart';
 import 'screens/profile/profile_screen.dart';
+import 'screens/spin_wheel_screen.dart';
 
 /// 🔥 ДОБАВИЛ MAIN
 void main() async {
@@ -65,6 +67,8 @@ class MyApp extends StatelessWidget {
         "/clicker": (context) => const ClickerScreen(),
         "/tic_tac_toe": (context) => const TicTacToeScreen(),
         "/sudoku": (context) => const SudokuScreen(),
+
+        "/spin": (context) => const SpinWheelScreen(),
       },
     );
   }

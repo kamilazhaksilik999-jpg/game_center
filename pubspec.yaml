@@ -28,7 +28,7 @@ dependencies:
   # 🎮 Flame (для игр)
   flame: ^1.18.0
 
-  # 🖼️ изображения
+  # 🖼️ изображения + выбор из галереи
   image_picker: ^1.1.2
 
 dev_dependencies:
