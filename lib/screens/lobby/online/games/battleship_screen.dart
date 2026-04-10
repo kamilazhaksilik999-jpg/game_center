@@ -1,19 +1,10 @@
 // lobby/online/games/battleship/battleship_screen.dart
 //
-// СТРУКТУРА ФАЙЛОВ для морского боя:
-//   battleship_screen.dart   ← этот файл (главный экран, выбор режима)
-//   battleship_ai.dart       ← игра против ИИ
-//   battleship_room.dart     ← онлайн с другом (Firestore)
-//
-// В online_games_screen.dart добавь:
-//   case 'seabattle':
-//     switch (widget.selectedMode) {
-//       case 'ai':   → BattleshipAIScreen()
-//       case 'room': → BattleshipRoomScreen()
-//       case 'random': → BattleshipAIScreen() // тоже ИИ
-//     }
-//asdfghjkasdfghjk
-//измн
+// СТРУКТУРА ФАЙЛОВ:
+//   battleship_screen.dart   ← этот файл (выбор режима)
+//   battleship_ai.dart       ← игра против ИИ (поля рядом: слева ты, справа враг)
+//   battleship_room.dart     ← онлайн с другом (поля рядом: слева ты, справа враг)
+
 import 'package:flutter/material.dart';
 import 'battleship_ai_screen.dart';
 import 'battleship_room.dart';
@@ -56,14 +47,15 @@ class BattleshipScreen extends StatelessWidget {
               style: TextStyle(color: Colors.white38, fontSize: 14),
             ),
             const SizedBox(height: 48),
-
             _ModeCard(
               icon: '🤖',
               title: 'Против ИИ',
               subtitle: 'Сражайся с умным флотом',
               color: const Color(0xFF00C896),
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const BattleshipAIScreen())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BattleshipAIScreen()),
+              ),
             ),
             const SizedBox(height: 16),
             _ModeCard(
@@ -71,8 +63,10 @@ class BattleshipScreen extends StatelessWidget {
               title: 'Играть с другом',
               subtitle: 'Создай комнату или войди по коду',
               color: const Color(0xFF5B8DEF),
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const BattleshipRoomScreen())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BattleshipRoomScreen()),
+              ),
             ),
           ],
         ),
@@ -105,7 +99,10 @@ class _ModeCardState extends State<_ModeCard> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) { setState(() => _pressed = false); widget.onTap(); },
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
       onTapCancel: () => setState(() => _pressed = false),
       child: AnimatedScale(
         scale: _pressed ? 0.96 : 1.0,
@@ -117,29 +114,44 @@ class _ModeCardState extends State<_ModeCard> {
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: widget.color.withOpacity(0.5), width: 1.5),
             boxShadow: [
-              BoxShadow(color: widget.color.withOpacity(0.18), blurRadius: 18, offset: const Offset(0, 8)),
+              BoxShadow(
+                color: widget.color.withOpacity(0.18),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
             ],
           ),
           child: Row(
             children: [
               Container(
-                width: 54, height: 54,
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
                   color: widget.color.withOpacity(0.13),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Center(child: Text(widget.icon, style: const TextStyle(fontSize: 26))),
+                child: Center(
+                  child: Text(widget.icon, style: const TextStyle(fontSize: 26)),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.title,
-                        style: TextStyle(color: widget.color, fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(
+                      widget.title,
+                      style: TextStyle(
+                        color: widget.color,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(widget.subtitle,
-                        style: const TextStyle(color: Colors.white38, fontSize: 13)),
+                    Text(
+                      widget.subtitle,
+                      style: const TextStyle(color: Colors.white38, fontSize: 13),
+                    ),
                   ],
                 ),
               ),
