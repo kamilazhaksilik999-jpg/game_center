@@ -1,169 +1,151 @@
+// lobby/online/games/battleship/battleship_screen.dart
+//
+// СТРУКТУРА ФАЙЛОВ для морского боя:
+//   battleship_screen.dart   ← этот файл (главный экран, выбор режима)
+//   battleship_ai.dart       ← игра против ИИ
+//   battleship_room.dart     ← онлайн с другом (Firestore)
+//
+// В online_games_screen.dart добавь:
+//   case 'seabattle':
+//     switch (widget.selectedMode) {
+//       case 'ai':   → BattleshipAIScreen()
+//       case 'room': → BattleshipRoomScreen()
+//       case 'random': → BattleshipAIScreen() // тоже ИИ
+//     }
+
 import 'package:flutter/material.dart';
-import 'dart:math';
+import 'battleship_ai_screen.dart';
+import 'battleship_room.dart';
 
-class BattleshipScreen extends StatefulWidget {
-  final String? roomId;
-  final bool isHost;
-  final bool isAi;
-
-  const BattleshipScreen({
-    super.key,
-    this.roomId,
-    this.isHost = true,
-    this.isAi = false,
-  });
-
-  @override
-  State<BattleshipScreen> createState() => _BattleshipScreenState();
-}
-
-class _BattleshipScreenState extends State<BattleshipScreen> {
-  List<int> myBoard = List.filled(25, 0);
-  List<int> enemyBoard = List.filled(25, 0);
-  bool _isReady = false;
-  bool _finished = false;
-  int turn = 1;
-  Random _rand = Random();
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.isAi) {
-      // расставляем случайно корабли ИИ
-      for (int i = 0; i < 25; i++) {
-        enemyBoard[i] = (_rand.nextBool() && i % 5 != 0) ? 1 : 0;
-      }
-    }
-  }
-
-  void _placeShip(int i) {
-    if (_isReady) return;
-    setState(() {
-      myBoard[i] = (myBoard[i] == 1) ? 0 : 1;
-    });
-  }
-
-  void _confirmReady() {
-    setState(() => _isReady = true);
-    if (widget.isAi) _aiPlay();
-  }
-
-  void _shoot(int i, List<int> board) {
-    if (!_isReady || _finished) return;
-    if (board[i] > 1) return;
-
-    setState(() {
-      board[i] = (board[i] == 1) ? 3 : 2;
-    });
-
-    _checkWinner();
-
-    if (widget.isAi) {
-      Future.delayed(const Duration(milliseconds: 500), _aiPlay);
-    }
-  }
-
-  void _aiPlay() {
-    int idx = _rand.nextInt(25);
-    while (myBoard[idx] > 1) idx = _rand.nextInt(25);
-
-    setState(() {
-      myBoard[idx] = (myBoard[idx] == 1) ? 3 : 2;
-    });
-
-    _checkWinner();
-  }
-
-  void _checkWinner() {
-    if (_finished) return;
-    if (!myBoard.contains(1)) _endGame("ИИ");
-    if (!enemyBoard.contains(1)) _endGame("Ты");
-  }
-
-  void _endGame(String winner) {
-    if (_finished) return;
-    _finished = true;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: const Text("ФЛОТ УНИЧТОЖЕН! ⚓"),
-        content: Text("Победитель: $winner"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-            child: const Text("В МЕНЮ"),
-          )
-        ],
-      ),
-    );
-  }
+class BattleshipScreen extends StatelessWidget {
+  const BattleshipScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blueGrey[900],
+      backgroundColor: const Color(0xFF0A1628),
       appBar: AppBar(
-        title: const Text("Морской бой"),
-        backgroundColor: Colors.teal,
+        backgroundColor: const Color(0xFF0D2137),
+        leading: BackButton(color: Colors.white54),
+        title: const Text(
+          '🚢 Морской бой',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
       ),
-      body: SafeArea(
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
         child: Column(
           children: [
             const SizedBox(height: 20),
-            const Text("Поле врага", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-            _buildGrid(enemyBoard, (i) => _shoot(i, enemyBoard), hideShips: true),
-            const Divider(color: Colors.white24, thickness: 2),
-            const Text("Твой флот", style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
-            _buildGrid(myBoard, (i) => _placeShip(i), hideShips: false),
-            if (!_isReady)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: ElevatedButton(
-                  onPressed: _confirmReady,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                  child: const Text("Я ГОТОВ"),
-                ),
+            const Text('⚓', style: TextStyle(fontSize: 72)),
+            const SizedBox(height: 16),
+            const Text(
+              'Выбери режим',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
               ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Расставь флот и топи врага',
+              style: TextStyle(color: Colors.white38, fontSize: 14),
+            ),
+            const SizedBox(height: 48),
+
+            _ModeCard(
+              icon: '🤖',
+              title: 'Против ИИ',
+              subtitle: 'Сражайся с умным флотом',
+              color: const Color(0xFF00C896),
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const BattleshipAIScreen())),
+            ),
+            const SizedBox(height: 16),
+            _ModeCard(
+              icon: '🏠',
+              title: 'Играть с другом',
+              subtitle: 'Создай комнату или войди по коду',
+              color: const Color(0xFF5B8DEF),
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const BattleshipRoomScreen())),
+            ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildGrid(List<int> board, Function(int) onTap, {required bool hideShips}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 5,
-          mainAxisSpacing: 4,
-          crossAxisSpacing: 4,
-        ),
-        itemCount: 25,
-        itemBuilder: (_, i) {
-          Color cellColor = Colors.blue[300]!;
-          Widget icon = const SizedBox();
+class _ModeCard extends StatefulWidget {
+  final String icon, title, subtitle;
+  final Color color;
+  final VoidCallback onTap;
 
-          if (board[i] == 1 && !hideShips) cellColor = Colors.grey;
-          if (board[i] == 2) icon = const Icon(Icons.close, color: Colors.white, size: 18);
-          if (board[i] == 3) icon = const Icon(Icons.whatshot, color: Colors.white, size: 18);
+  const _ModeCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
 
-          return GestureDetector(
-            onTap: () => onTap(i),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              decoration: BoxDecoration(
-                color: cellColor,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.black26),
+  @override
+  State<_ModeCard> createState() => _ModeCardState();
+}
+
+class _ModeCardState extends State<_ModeCard> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) { setState(() => _pressed = false); widget.onTap(); },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D2137),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: widget.color.withOpacity(0.5), width: 1.5),
+            boxShadow: [
+              BoxShadow(color: widget.color.withOpacity(0.18), blurRadius: 18, offset: const Offset(0, 8)),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 54, height: 54,
+                decoration: BoxDecoration(
+                  color: widget.color.withOpacity(0.13),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(child: Text(widget.icon, style: const TextStyle(fontSize: 26))),
               ),
-              child: Center(child: icon),
-            ),
-          );
-        },
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.title,
+                        style: TextStyle(color: widget.color, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(widget.subtitle,
+                        style: const TextStyle(color: Colors.white38, fontSize: 13)),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded, color: widget.color, size: 16),
+            ],
+          ),
+        ),
       ),
     );
   }
