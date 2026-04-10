@@ -602,3 +602,4 @@ class _Segment {
   final String emoji;
   const _Segment(this.label, this.coins, this.color, this.emoji);
 }
+//да
