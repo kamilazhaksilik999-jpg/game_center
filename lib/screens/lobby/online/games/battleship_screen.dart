@@ -12,6 +12,7 @@
 //       case 'room': → BattleshipRoomScreen()
 //       case 'random': → BattleshipAIScreen() // тоже ИИ
 //     }
+//asdfghjkasdfghjk
 
 import 'package:flutter/material.dart';
 import 'battleship_ai_screen.dart';
