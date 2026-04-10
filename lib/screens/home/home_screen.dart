@@ -3,8 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:game_center/screens/lobby/lobby_screen.dart';
 import '../../data/levels.dart';
 import '../../features/leaderboard/leaderboard_provider.dart';
+import '../../features/leaderboard/leaderboard_screen.dart'; // ✅ импорт
 import '../../core/services/coin_service.dart';
 import '../../core/services/user_service.dart';
+
 /// 🎮 ЭКРАНЫ ИГР
 import '../../games/solo/memory/memory_screen.dart';
 import '../../games/solo/math/math_screen.dart';
@@ -21,71 +23,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-
-  void showLeaderboard() {
-    final provider = LeaderboardProvider();
-
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (_) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  "🏆 Мировой рейтинг",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 250,
-                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: provider.getLeaderboard(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError) {
-                        return Center(child: Text("Ошибка: ${snapshot.error}"));
-                      }
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return const Center(child: Text("Нет игроков"));
-                      }
-
-                      final players = snapshot.data!.docs;
-
-                      return ListView.builder(
-                        itemCount: players.length,
-                        itemBuilder: (context, index) {
-                          final data = players[index].data();
-                          final name = data['name'] ?? 'Player';
-                          final rating = data['rating'] ?? 0;
-                          return ListTile(
-                            title: Text("${index + 1}. $name - $rating"),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   Future<void> openGame(Widget screen) async {
     await Navigator.push(
@@ -107,10 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF0F172A),
-              Color(0xFF1E293B),
-            ],
+            colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -121,39 +55,94 @@ class _HomeScreenState extends State<HomeScreen> {
 
               /// 🔝 HEADER
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+
+                    // Название
                     const Text(
                       "🎮 GameZone",
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+
+                    // Все кнопки справа
                     Row(
                       children: [
+
+                        // 🏆 РЕЙТИНГ — ведёт на LeaderboardScreen
+                        _topButton(
+                          Icons.emoji_events,
+                          Colors.amber,
+                              () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LeaderboardScreen(),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        // 🎰 КОЛЕСО УДАЧИ — отдельная кнопка с градиентом
+                        GestureDetector(
+                          onTap: () => Navigator.pushNamed(context, "/spin"),
+                          child: Container(
+                            width: 45,
+                            height: 45,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF7C3AED), Color(0xFFDB2777)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.purple.withValues(alpha: 0.5),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.rotate_right,
+                              color: Colors.white,
+                              size: 26,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        // 🛒 МАГАЗИН
                         _topButton(Icons.store, Colors.orange, () {
                           Navigator.pushNamed(context, "/shop");
                         }),
+
                         const SizedBox(width: 8),
+
+                        // 📡 ЛОББИ
                         _topButton(Icons.wifi, Colors.green, () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => LobbyScreen()),
                           );
                         }),
+
                         const SizedBox(width: 8),
 
-                        // ✅ ПРОФИЛЬ — ТЕПЕРЬ РАБОЧИЙ
+                        // 👤 ПРОФИЛЬ
                         _topButton(Icons.person, Colors.pink, () async {
                           await Navigator.pushNamed(context, "/profile");
-                          setState(() {}); // обновляем монеты после возврата
+                          setState(() {});
                         }),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
@@ -184,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 20),
 
-              /// 🎮 СЕТКА
+              /// 🎮 СЕТКА ИГР
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -232,12 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _gameCard(
-      String title,
-      String image,
-      Color color,
-      VoidCallback onTap,
-      ) {
+  Widget _gameCard(String title, String image, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -262,10 +246,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
+            Text(title,
+                style: const TextStyle(color: Colors.white, fontSize: 12)),
           ],
         ),
       ),

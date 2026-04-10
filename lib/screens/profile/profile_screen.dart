@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:image_picker/image_picker.dart';
 import 'dart:math';
-import 'dart:convert';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,19 +18,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   final List<String> _avatars = [
     '😊','😎','🦊','🐱','🎮','🦁','🐺','🤖','👾','🎯',
-    '🐸','🐼','🦄','🐲','👻','🤡','🦅','🐯','🦸','🧙',
+    '🐸','🐼','🦄','🐲','👻','🤩','🦸','🧙','🥷','🎭',
   ];
   String _selectedAvatar = '😊';
   final _nameController = TextEditingController();
   final _friendIdController = TextEditingController();
 
-  // Стоимость повышения ранга
-  final Map<String, int> _rankUpgradeCost = {
+  final List<String> _rankOrder = ['Новичок', 'Медиум', 'Профи', 'Легенда'];
+  final Map<String, int> _rankCost = {
     'Новичок': 500,
     'Медиум': 1500,
     'Профи': 3000,
   };
-  final List<String> _rankOrder = ['Новичок', 'Медиум', 'Профи', 'Легенда'];
 
   @override
   void initState() {
@@ -47,15 +44,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  // ══════════════════════════════════════════
-  // 🔥 ЗАГРУЗКА
-  // ══════════════════════════════════════════
+  // ✅ Загрузка — сначала кэш потом сеть
   Future<void> _loadUser() async {
     final prefs = await SharedPreferences.getInstance();
     final savedId = prefs.getString('user_id');
 
     if (savedId != null) {
       try {
+        // Сначала кэш — быстро
         final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(savedId)
@@ -63,30 +59,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (doc.exists) {
           setState(() {
             _userId = savedId;
-            _userData = doc.data();
+            _userData = Map<String, dynamic>.from(doc.data()!);
+            _isRegistered = true;
+            _isLoading = false;
+          });
+          // Обновляем из сети в фоне
+          _refreshFromNetwork(savedId);
+          return;
+        }
+      } catch (_) {}
+
+      try {
+        // Кэша нет — идём в сеть
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(savedId)
+            .get();
+        if (doc.exists) {
+          setState(() {
+            _userId = savedId;
+            _userData = Map<String, dynamic>.from(doc.data()!);
             _isRegistered = true;
             _isLoading = false;
           });
           return;
         }
-      } catch (_) {
-        try {
-          final doc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(savedId)
-              .get();
-          if (doc.exists) {
-            setState(() {
-              _userId = savedId;
-              _userData = doc.data();
-              _isRegistered = true;
-              _isLoading = false;
-            });
-            return;
-          }
-        } catch (e) {
-          debugPrint('Firestore error: $e');
-        }
+      } catch (e) {
+        debugPrint('Firestore error: $e');
       }
     }
 
@@ -96,19 +95,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  // ══════════════════════════════════════════
-  // 🔥 РЕГИСТРАЦИЯ
-  // ══════════════════════════════════════════
+  // Обновление из сети в фоне
+  Future<void> _refreshFromNetwork(String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get(const GetOptions(source: Source.server));
+      if (doc.exists && mounted) {
+        setState(() {
+          _userData = Map<String, dynamic>.from(doc.data()!);
+        });
+      }
+    } catch (_) {}
+  }
+
+  // ✅ Регистрация — мгновенно
   Future<void> _register() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
-
     setState(() => _isLoading = true);
 
     final id = (1000 + Random().nextInt(9000)).toString();
     final uid = 'user_${DateTime.now().millisecondsSinceEpoch}';
 
-    final data = {
+    final data = <String, dynamic>{
       'name': name,
       'id': '#$id',
       'coins': 0,
@@ -116,7 +127,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'gamesPlayed': 0,
       'rank': 'Новичок',
       'avatar': _selectedAvatar,
-      'avatarImage': null,
       'friends': [],
     };
 
@@ -130,19 +140,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _isLoading = false;
     });
 
+    // Firebase в фоне
     FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .set({...data, 'createdAt': FieldValue.serverTimestamp()})
-        .catchError((e) => debugPrint('Firestore error: $e'));
+        .catchError((e) => debugPrint('Firebase: $e'));
   }
 
-  // ══════════════════════════════════════════
-  // ✏️ ИЗМЕНЕНИЕ ИМЕНИ
-  // ══════════════════════════════════════════
+  // ✅ Изменение имени — сохраняется в Firebase
   Future<void> _editName() async {
     _nameController.text = _userData?['name'] ?? '';
-
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -153,6 +161,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           controller: _nameController,
           style: const TextStyle(color: Colors.white),
           maxLength: 20,
+          autofocus: true,
           decoration: InputDecoration(
             hintText: 'Новое имя',
             hintStyle: const TextStyle(color: Colors.white38),
@@ -160,32 +169,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
             filled: true,
             fillColor: Colors.white.withValues(alpha: 0.1),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
-            ),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
-          ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Отмена')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            style:
+            ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             onPressed: () async {
               final newName = _nameController.text.trim();
               if (newName.isEmpty) return;
 
-              setState(() {
-                _userData!['name'] = newName;
-              });
-
-              FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(_userId)
-                  .update({'name': newName});
-
+              // ✅ Сразу обновляем UI
+              setState(() => _userData!['name'] = newName);
               Navigator.pop(context);
+
+              // ✅ Сохраняем в Firebase
+              if (_userId != null) {
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(_userId)
+                    .update({'name': newName});
+              }
+              _showSnack('Имя сохранено ✅');
             },
             child: const Text('Сохранить'),
           ),
@@ -194,186 +204,123 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ══════════════════════════════════════════
-  // 🖼️ ИЗМЕНЕНИЕ АВАТАРА
-  // ══════════════════════════════════════════
+  // ✅ Смена аватара — сохраняется в Firebase
   Future<void> _changeAvatar() async {
     await showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF16213E),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Выбери аватар',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-
-              // Кнопка загрузки фото
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  icon: const Icon(Icons.photo_library),
-                  label: const Text('Загрузить фото из галереи'),
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    await _pickImageFromGallery();
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 16),
-              const Text('или выбери эмодзи',
-                  style: TextStyle(color: Colors.white54)),
-              const SizedBox(height: 12),
-
-              // Сетка эмодзи
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                alignment: WrapAlignment.center,
-                children: _avatars.map((emoji) {
-                  return GestureDetector(
-                    onTap: () async {
-                      setState(() {
-                        _userData!['avatar'] = emoji;
-                        _userData!['avatarImage'] = null;
-                      });
-                      FirebaseFirestore.instance
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Выбери аватар',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: _avatars.map((emoji) {
+                return GestureDetector(
+                  onTap: () async {
+                    setState(() => _userData!['avatar'] = emoji);
+                    Navigator.pop(context);
+                    // ✅ Сохраняем в Firebase
+                    if (_userId != null) {
+                      await FirebaseFirestore.instance
                           .collection('users')
                           .doc(_userId)
-                          .update({'avatar': emoji, 'avatarImage': null});
-                      Navigator.pop(ctx);
-                    },
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withValues(alpha: 0.1),
-                      ),
-                      child: Center(
-                        child: Text(emoji,
-                            style: const TextStyle(fontSize: 26)),
-                      ),
+                          .update({'avatar': emoji});
+                    }
+                    _showSnack('Аватар изменён ✅');
+                  },
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.1),
                     ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
+                    child: Center(
+                        child: Text(emoji,
+                            style: const TextStyle(fontSize: 28))),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+          ],
         ),
       ),
     );
   }
 
-  Future<void> _pickImageFromGallery() async {
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 300,
-        maxHeight: 300,
-        imageQuality: 70,
-      );
-      if (picked == null) return;
-
-      final bytes = await picked.readAsBytes();
-      final base64Image = base64Encode(bytes);
-
-      setState(() {
-        _userData!['avatarImage'] = base64Image;
-      });
-
-      FirebaseFirestore.instance
-          .collection('users')
-          .doc(_userId)
-          .update({'avatarImage': base64Image});
-    } catch (e) {
-      debugPrint('Image error: $e');
-    }
-  }
-
-  // ══════════════════════════════════════════
-  // 🏆 ПОВЫШЕНИЕ РАНГА ЗА МОНЕТЫ
-  // ══════════════════════════════════════════
+  // ✅ Повышение ранга за монеты
   Future<void> _upgradeRank() async {
-    final currentRank = _userData?['rank'] ?? 'Новичок';
-    final currentIndex = _rankOrder.indexOf(currentRank);
-
-    if (currentIndex >= _rankOrder.length - 1) {
+    final rank = _userData?['rank'] ?? 'Новичок';
+    final idx = _rankOrder.indexOf(rank);
+    if (idx >= _rankOrder.length - 1) {
       _showSnack('Ты уже на максимальном ранге! 👑');
       return;
     }
 
-    final nextRank = _rankOrder[currentIndex + 1];
-    final cost = _rankUpgradeCost[currentRank] ?? 999999;
+    final nextRank = _rankOrder[idx + 1];
+    final cost = _rankCost[rank] ?? 9999;
     final coins = _userData?['coins'] ?? 0;
 
     if (coins < cost) {
-      _showSnack('Недостаточно монет! Нужно $cost 🪙');
+      _showSnack('Нужно $cost 🪙, у тебя только $coins 🪙');
       return;
     }
 
-    await showDialog(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF16213E),
-        title: Text('Повысить ранг до $nextRank?',
+        title: Text('Повысить до $nextRank?',
             style: const TextStyle(color: Colors.white)),
-        content: Text(
-          'Стоимость: $cost 🪙\nТвои монеты: $coins 🪙',
-          style: const TextStyle(color: Colors.white70),
-        ),
+        content: Text('Спишется $cost 🪙\nОстаток: ${coins - cost} 🪙',
+            style: const TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
-          ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Отмена')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            onPressed: () async {
-              final newCoins = coins - cost;
-              setState(() {
-                _userData!['rank'] = nextRank;
-                _userData!['coins'] = newCoins;
-              });
-
-              FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(_userId)
-                  .update({'rank': nextRank, 'coins': newCoins});
-
-              Navigator.pop(context);
-              _showSnack('Ранг повышен до $nextRank! 🎉');
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Купить'),
           ),
         ],
       ),
     );
+
+    if (confirm != true) return;
+
+    final newCoins = coins - cost;
+    setState(() {
+      _userData!['rank'] = nextRank;
+      _userData!['coins'] = newCoins;
+    });
+
+    // ✅ Сохраняем в Firebase
+    if (_userId != null) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_userId)
+          .update({'rank': nextRank, 'coins': newCoins});
+    }
+    _showSnack('Ранг повышен до $nextRank! 🎉');
   }
 
-  // ══════════════════════════════════════════
-  // 👥 ДОБАВЛЕНИЕ ДРУГА
-  // ══════════════════════════════════════════
+  // ✅ Добавление реального друга по ID
   Future<void> _addFriend() async {
     _friendIdController.clear();
-
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -382,31 +329,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
             style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: _friendIdController,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.white, letterSpacing: 2),
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
-            hintText: 'Введи ID друга (например: 4821)',
-            hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+            hintText: 'Введи ID игрока',
+            hintStyle: const TextStyle(color: Colors.white38),
             filled: true,
             fillColor: Colors.white.withValues(alpha: 0.1),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
-            ),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none),
             prefixText: '#',
-            prefixStyle: const TextStyle(color: Colors.orange),
+            prefixStyle: const TextStyle(
+                color: Colors.orange, fontWeight: FontWeight.bold),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
-          ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Отмена')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
             onPressed: () async {
+              final input = _friendIdController.text.trim();
+              if (input.isEmpty) return;
               Navigator.pop(context);
-              await _searchAndAddFriend('#${_friendIdController.text.trim()}');
+              await _searchFriend('#$input');
             },
             child: const Text('Найти'),
           ),
@@ -415,7 +363,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _searchAndAddFriend(String friendId) async {
+  Future<void> _searchFriend(String friendId) async {
     if (friendId == _userData?['id']) {
       _showSnack('Нельзя добавить себя 😅');
       return;
@@ -423,13 +371,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final List friends = List.from(_userData?['friends'] ?? []);
     if (friends.any((f) => f['id'] == friendId)) {
-      _showSnack('Этот игрок уже в друзьях!');
+      _showSnack('Уже в друзьях!');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
+      // ✅ Ищем по ID в Firebase
       final query = await FirebaseFirestore.instance
           .collection('users')
           .where('id', isEqualTo: friendId)
@@ -442,12 +391,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return;
       }
 
-      final foundUser = query.docs.first.data();
+      final found = query.docs.first.data();
       final newFriend = {
-        'id': foundUser['id'],
-        'name': foundUser['name'],
-        'avatar': foundUser['avatar'] ?? '😊',
-        'online': false,
+        'id': found['id'],
+        'name': found['name'],
+        'avatar': found['avatar'] ?? '😊',
       };
 
       friends.add(newFriend);
@@ -457,64 +405,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _isLoading = false;
       });
 
-      FirebaseFirestore.instance
-          .collection('users')
-          .doc(_userId)
-          .update({'friends': friends});
+      // ✅ Сохраняем в Firebase
+      if (_userId != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(_userId)
+            .update({'friends': friends});
+      }
 
-      _showSnack('${foundUser['name']} добавлен в друзья! 🎉');
+      _showSnack('${found['name']} добавлен в друзья! 🎉');
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnack('Ошибка поиска');
+      _showSnack('Ошибка: $e');
     }
   }
 
-  // ══════════════════════════════════════════
-  // ❌ УДАЛЕНИЕ ДРУГА
-  // ══════════════════════════════════════════
+  // ✅ Удаление друга
   Future<void> _removeFriend(String friendId, String friendName) async {
-    final confirm = await showDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF16213E),
         title: const Text('Удалить друга?',
             style: TextStyle(color: Colors.white)),
-        content: Text('$friendName будет удалён из друзей',
+        content: Text('$friendName будет удалён',
             style: const TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Отмена')),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить',
-                style: TextStyle(color: Colors.red)),
-          ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Удалить',
+                  style: TextStyle(color: Colors.red))),
         ],
       ),
     );
-
-    if (confirm != true) return;
+    if (ok != true) return;
 
     final List friends = List.from(_userData?['friends'] ?? []);
     friends.removeWhere((f) => f['id'] == friendId);
 
-    setState(() {
-      _userData!['friends'] = friends;
-    });
+    setState(() => _userData!['friends'] = friends);
 
-    FirebaseFirestore.instance
-        .collection('users')
-        .doc(_userId)
-        .update({'friends': friends});
-
-    _showSnack('$friendName удалён из друзей');
+    if (_userId != null) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_userId)
+          .update({'friends': friends});
+    }
+    _showSnack('$friendName удалён');
   }
 
-  // ══════════════════════════════════════════
-  // 🔴 ВЫХОД
-  // ══════════════════════════════════════════
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('user_id');
@@ -526,19 +468,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: const Color(0xFF16213E),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: const Color(0xFF16213E),
+      behavior: SnackBarBehavior.floating,
+      shape:
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
   }
 
-  // ══════════════════════════════════════════
-  // 🏗️ BUILD
-  // ══════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -548,14 +486,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: CircularProgressIndicator(color: Colors.orange)),
       );
     }
-    if (!_isRegistered) return _buildRegistrationScreen();
+    if (!_isRegistered) return _buildRegScreen();
     return _buildProfileScreen();
   }
 
-  // ══════════════════════════════════════════
-  // 📋 ЭКРАН РЕГИСТРАЦИИ
-  // ══════════════════════════════════════════
-  Widget _buildRegistrationScreen() {
+  // ══════ РЕГИСТРАЦИЯ ══════
+  Widget _buildRegScreen() {
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
       body: SafeArea(
@@ -571,58 +507,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               const Text('Выбери аватар и введи имя',
-                  style: TextStyle(color: Colors.white54, fontSize: 14)),
+                  style:
+                  TextStyle(color: Colors.white54, fontSize: 14)),
               const SizedBox(height: 40),
-
-              // Выбранный аватар
               Container(
-                width: 90,
-                height: 90,
+                width: 90, height: 90,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [Color(0xFFFFB347), Color(0xFFFF6B6B)],
-                  ),
+                      colors: [Color(0xFFFFB347), Color(0xFFFF6B6B)]),
                 ),
                 child: Center(
-                  child: Text(_selectedAvatar,
-                      style: const TextStyle(fontSize: 44)),
-                ),
+                    child: Text(_selectedAvatar,
+                        style: const TextStyle(fontSize: 44))),
               ),
               const SizedBox(height: 24),
-
-              // Сетка аватаров
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 10, runSpacing: 10,
                 alignment: WrapAlignment.center,
-                children: _avatars.map((emoji) {
-                  final isSelected = emoji == _selectedAvatar;
+                children: _avatars.map((e) {
+                  final sel = e == _selectedAvatar;
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedAvatar = emoji),
+                    onTap: () => setState(() => _selectedAvatar = e),
                     child: Container(
-                      width: 52,
-                      height: 52,
+                      width: 52, height: 52,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isSelected
+                        color: sel
                             ? Colors.orange.withValues(alpha: 0.3)
                             : Colors.white.withValues(alpha: 0.1),
-                        border: isSelected
+                        border: sel
                             ? Border.all(color: Colors.orange, width: 2)
                             : null,
                       ),
                       child: Center(
-                        child: Text(emoji,
-                            style: const TextStyle(fontSize: 26)),
-                      ),
+                          child: Text(e,
+                              style: const TextStyle(fontSize: 26))),
                     ),
                   );
                 }).toList(),
               ),
               const SizedBox(height: 32),
-
-              // Поле имени
               TextField(
                 controller: _nameController,
                 style: const TextStyle(color: Colors.white),
@@ -634,18 +559,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   filled: true,
                   fillColor: Colors.white.withValues(alpha: 0.1),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
-                  ),
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none),
                   prefixIcon:
                   const Icon(Icons.person, color: Colors.white54),
                 ),
               ),
               const SizedBox(height: 24),
-
               SizedBox(
-                width: double.infinity,
-                height: 54,
+                width: double.infinity, height: 54,
                 child: ElevatedButton(
                   onPressed: _register,
                   style: ElevatedButton.styleFrom(
@@ -665,9 +587,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ══════════════════════════════════════════
-  // 👤 ЭКРАН ПРОФИЛЯ
-  // ══════════════════════════════════════════
+  // ══════ ПРОФИЛЬ ══════
   Widget _buildProfileScreen() {
     final data = _userData!;
     final String name = data['name'] ?? 'Player';
@@ -677,13 +597,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final int games = data['gamesPlayed'] ?? 0;
     final String rank = data['rank'] ?? 'Новичок';
     final String avatar = data['avatar'] ?? '😊';
-    final String? avatarImage = data['avatarImage'];
     final List friends = data['friends'] ?? [];
 
-    final currentRankIndex = _rankOrder.indexOf(rank);
-    final isMaxRank = currentRankIndex >= _rankOrder.length - 1;
-    final nextRank = isMaxRank ? null : _rankOrder[currentRankIndex + 1];
-    final upgradeCost = isMaxRank ? null : _rankUpgradeCost[rank];
+    final rankIdx = _rankOrder.indexOf(rank);
+    final isMax = rankIdx >= _rankOrder.length - 1;
+    final nextRank = isMax ? null : _rankOrder[rankIdx + 1];
+    final cost = isMax ? null : _rankCost[rank];
 
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
@@ -691,59 +610,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           children: [
 
-            // ══════════ ШАПКА ══════════
+            // ── Шапка ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.only(top: 60, bottom: 28),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Color(0xFF833AB4),
-                    Color(0xFFE1306C),
-                    Color(0xFFFD1D1D)
-                  ],
+                  colors: [Color(0xFF833AB4), Color(0xFFE1306C), Color(0xFFFD1D1D)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
               ),
               child: Column(
                 children: [
-
                   // Кликабельный аватар
                   GestureDetector(
                     onTap: _changeAvatar,
                     child: Stack(
                       children: [
                         Container(
-                          width: 90,
-                          height: 90,
+                          width: 90, height: 90,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.orange.shade300,
                           ),
-                          child: ClipOval(
-                            child: avatarImage != null
-                                ? Image.memory(
-                              base64Decode(avatarImage),
-                              fit: BoxFit.cover,
-                            )
-                                : Center(
-                                child: Text(avatar,
-                                    style:
-                                    const TextStyle(fontSize: 46))),
-                          ),
+                          child: Center(
+                              child: Text(avatar,
+                                  style: const TextStyle(fontSize: 46))),
                         ),
-                        // Иконка редактирования
                         Positioned(
-                          right: 0,
-                          bottom: 0,
+                          right: 0, bottom: 0,
                           child: Container(
-                            width: 26,
-                            height: 26,
+                            width: 26, height: 26,
                             decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.orange,
-                            ),
+                                shape: BoxShape.circle,
+                                color: Colors.orange),
                             child: const Icon(Icons.edit,
                                 size: 14, color: Colors.white),
                           ),
@@ -751,7 +652,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
 
                   // Кликабельное имя
@@ -771,17 +671,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
-
                   Text('ID: $id',
                       style: const TextStyle(
                           color: Colors.white60, fontSize: 13)),
                   const SizedBox(height: 10),
-                  _buildRankBadge(rank),
+                  _rankBadge(rank),
                 ],
               ),
             ),
 
-            // ══════════ СТАТИСТИКА ══════════
+            // ── Статистика ──
             Container(
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.symmetric(vertical: 20),
@@ -792,23 +691,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildStat('$coins', 'монет', Colors.yellow),
-                  _buildDivider(),
-                  _buildStat('$wins', 'побед', Colors.greenAccent),
-                  _buildDivider(),
-                  _buildStat('$games', 'игр сыграно', Colors.lightBlueAccent),
+                  _stat('$coins', 'монет', Colors.yellow),
+                  _divider(),
+                  _stat('$wins', 'побед', Colors.greenAccent),
+                  _divider(),
+                  _stat('$games', 'игр', Colors.lightBlueAccent),
                 ],
               ),
             ),
 
-            // ══════════ ПОВЫШЕНИЕ РАНГА ══════════
+            // ── Повышение ранга ──
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: const Color(0xFF16213E),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                       color: Colors.orange.withValues(alpha: 0.3)),
                 ),
@@ -821,27 +720,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isMaxRank
+                            isMax
                                 ? '👑 Максимальный ранг!'
-                                : 'Следующий ранг: $nextRank',
+                                : 'Следующий: $nextRank',
                             style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold),
                           ),
-                          if (!isMaxRank)
-                            Text(
-                              'Стоимость: $upgradeCost 🪙 (у тебя: $coins 🪙)',
-                              style: const TextStyle(
-                                  color: Colors.white54, fontSize: 12),
-                            ),
+                          if (!isMax)
+                            Text('Стоимость: $cost 🪙',
+                                style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 12)),
                         ],
                       ),
                     ),
-                    if (!isMaxRank)
+                    if (!isMax)
                       ElevatedButton(
-                        onPressed: coins >= (upgradeCost ?? 0)
-                            ? _upgradeRank
-                            : null,
+                        onPressed:
+                        coins >= (cost ?? 0) ? _upgradeRank : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.orange,
                           disabledBackgroundColor:
@@ -849,7 +746,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 8),
                           minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          tapTargetSize:
+                          MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: const Text('Купить',
                             style: TextStyle(fontSize: 12)),
@@ -859,54 +757,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            // ══════════ ЖЕТОНЫ ══════════
-            _buildSection('ЖЕТОНЫ', _buildBadges(rank)),
+            // ── Жетоны ──
+            _section('ЖЕТОНЫ', _badges(rank)),
 
-            // ══════════ ДРУЗЬЯ ══════════
-            _buildSection(
+            // ── Друзья ──
+            _section(
               'ДРУЗЬЯ',
-              _buildFriends(friends),
+              _friendsList(friends),
               action: TextButton.icon(
                 onPressed: _addFriend,
                 icon: const Icon(Icons.person_add,
                     size: 16, color: Colors.blue),
                 label: const Text('Добавить',
-                    style: TextStyle(color: Colors.blue, fontSize: 13)),
+                    style:
+                    TextStyle(color: Colors.blue, fontSize: 13)),
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // ══════════ ВЫЙТИ ══════════
+            // ── Выйти ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextButton(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      backgroundColor: const Color(0xFF16213E),
-                      title: const Text('Выйти?',
-                          style: TextStyle(color: Colors.white)),
-                      content: const Text('Данные профиля сохранятся',
-                          style: TextStyle(color: Colors.white54)),
-                      actions: [
-                        TextButton(
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    backgroundColor: const Color(0xFF16213E),
+                    title: const Text('Выйти?',
+                        style: TextStyle(color: Colors.white)),
+                    content: const Text('Данные сохранятся',
+                        style: TextStyle(color: Colors.white54)),
+                    actions: [
+                      TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('Отмена'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _logout();
-                          },
-                          child: const Text('Выйти',
-                              style: TextStyle(color: Colors.red)),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                          child: const Text('Отмена')),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _logout();
+                        },
+                        child: const Text('Выйти',
+                            style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                ),
                 child: Text('Выйти из профиля',
                     style: TextStyle(color: Colors.red.shade300)),
               ),
@@ -919,25 +815,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ══════════════════════════════════════════
-  // 🧩 ВСПОМОГАТЕЛЬНЫЕ ВИДЖЕТЫ
-  // ══════════════════════════════════════════
-
-  Widget _buildRankBadge(String rank) {
+  Widget _rankBadge(String rank) {
     final colors = {
       'Новичок': Colors.green,
       'Медиум': Colors.orange,
       'Профи': Colors.blue,
       'Легенда': Colors.purple,
     };
-    final icons = {
-      'Новичок': '🥇',
-      'Медиум': '🥈',
-      'Профи': '🏆',
-      'Легенда': '👑',
-    };
+    final icons = {'Новичок':'🥇','Медиум':'🥈','Профи':'🏆','Легенда':'👑'};
     final color = colors[rank] ?? Colors.grey;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
@@ -961,26 +847,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStat(String value, String label, Color color) {
-    return Column(
-      children: [
-        Text(value,
-            style: TextStyle(
-                color: color,
-                fontSize: 22,
-                fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(label,
-            style:
-            const TextStyle(color: Colors.white38, fontSize: 12)),
-      ],
-    );
-  }
+  Widget _stat(String v, String l, Color c) => Column(children: [
+    Text(v,
+        style: TextStyle(
+            color: c, fontSize: 22, fontWeight: FontWeight.bold)),
+    const SizedBox(height: 4),
+    Text(l,
+        style:
+        const TextStyle(color: Colors.white38, fontSize: 12)),
+  ]);
 
-  Widget _buildDivider() =>
+  Widget _divider() =>
       Container(width: 1, height: 36, color: Colors.white12);
 
-  Widget _buildSection(String title, Widget content, {Widget? action}) {
+  Widget _section(String title, Widget content, {Widget? action}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Column(
@@ -1004,26 +884,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildBadges(String currentRank) {
-    final badges = [
-      {'title': 'Новичок', 'icon': '🥇', 'color': Colors.green},
-      {'title': 'Медиум', 'icon': '🥈', 'color': Colors.orange},
-      {'title': 'Профи', 'icon': '🏆', 'color': Colors.blue},
-      {'title': 'Легенда', 'icon': '👑', 'color': Colors.purple},
+  Widget _badges(String rank) {
+    final list = [
+      {'t': 'Новичок', 'i': '🥇', 'c': Colors.green},
+      {'t': 'Медиум',  'i': '🥈', 'c': Colors.orange},
+      {'t': 'Профи',   'i': '🏆', 'c': Colors.blue},
+      {'t': 'Легенда', 'i': '👑', 'c': Colors.purple},
     ];
-    final currentIndex = _rankOrder.indexOf(currentRank);
-
+    final idx = _rankOrder.indexOf(rank);
     return Row(
-      children: badges.asMap().entries.map((entry) {
-        final i = entry.key;
-        final badge = entry.value;
-        final unlocked = i <= currentIndex;
-        final color = badge['color'] as Color;
-
+      children: list.asMap().entries.map((e) {
+        final unlocked = e.key <= idx;
+        final color = e.value['c'] as Color;
         return Expanded(
           child: Container(
-            margin: const EdgeInsets.only(right: 8),
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            margin: const EdgeInsets.only(right: 6),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFF16213E),
               borderRadius: BorderRadius.circular(12),
@@ -1034,26 +910,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             child: Column(
               children: [
-                Text(badge['icon'] as String,
+                Text(e.value['i'] as String,
                     style: TextStyle(
-                        fontSize: 28,
+                        fontSize: 26,
                         color: unlocked ? null : Colors.black45)),
-                const SizedBox(height: 6),
-                Text(badge['title'] as String,
-                    style: TextStyle(
-                        color:
-                        unlocked ? Colors.white : Colors.white30,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(
-                  unlocked ? '✓ Получен' : '🔒 Закрыт',
-                  style: TextStyle(
-                      color: unlocked
-                          ? Colors.greenAccent
-                          : Colors.white24,
-                      fontSize: 9),
-                ),
+                Text(e.value['t'] as String,
+                    style: TextStyle(
+                        color: unlocked
+                            ? Colors.white
+                            : Colors.white30,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 2),
+                Text(unlocked ? '✓ Получен' : '🔒 Закрыт',
+                    style: TextStyle(
+                        color: unlocked
+                            ? Colors.greenAccent
+                            : Colors.white24,
+                        fontSize: 8)),
               ],
             ),
           ),
@@ -1062,7 +937,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildFriends(List friends) {
+  Widget _friendsList(List friends) {
     if (friends.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(20),
@@ -1071,7 +946,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           borderRadius: BorderRadius.circular(14),
         ),
         child: const Center(
-          child: Text('Пока нет друзей 😔\nДобавь первого!',
+          child: Text('Пока нет друзей 😔\nДобавь по ID!',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white38, fontSize: 13)),
         ),
@@ -1088,75 +963,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final name = f['name'] ?? 'Player';
           final fId = f['id'] ?? '';
           final fAvatar = f['avatar'] ?? '😊';
-          final isOnline = f['online'] ?? false;
-
-          // Инициалы для аватара
-          final initials = name.length >= 2
-              ? name.substring(0, 2).toUpperCase()
-              : name.toUpperCase();
 
           return ListTile(
             leading: CircleAvatar(
               backgroundColor: Colors.primaries[
-              name.hashCode % Colors.primaries.length],
-              child: Text(initials,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13)),
+              name.hashCode.abs() % Colors.primaries.length],
+              child: Text(fAvatar,
+                  style: const TextStyle(fontSize: 20)),
             ),
             title: Text(name,
                 style: const TextStyle(color: Colors.white)),
-            subtitle: Row(
-              children: [
-                Icon(Icons.circle,
-                    size: 8,
-                    color: isOnline
-                        ? Colors.greenAccent
-                        : Colors.white38),
-                const SizedBox(width: 4),
-                Text(
-                  isOnline ? 'Онлайн' : 'Не в сети',
-                  style: TextStyle(
-                      color: isOnline
-                          ? Colors.greenAccent
-                          : Colors.white38,
-                      fontSize: 12),
+            subtitle: Text(fId,
+                style: const TextStyle(
+                    color: Colors.white38, fontSize: 12)),
+            trailing: GestureDetector(
+              onTap: () => _removeFriend(fId, name),
+              child: Container(
+                width: 30, height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.red.withValues(alpha: 0.2),
                 ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isOnline)
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('Играть',
-                        style: TextStyle(fontSize: 11)),
-                  ),
-                const SizedBox(width: 6),
-                // Кнопка удаления
-                GestureDetector(
-                  onTap: () => _removeFriend(fId, name),
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.red.withValues(alpha: 0.2),
-                    ),
-                    child: const Icon(Icons.close,
-                        size: 14, color: Colors.red),
-                  ),
-                ),
-              ],
+                child: const Icon(Icons.close,
+                    size: 16, color: Colors.red),
+              ),
             ),
           );
         }).toList(),
