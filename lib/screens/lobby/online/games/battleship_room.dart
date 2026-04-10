@@ -1,4 +1,7 @@
 // lobby/online/games/battleship/battleship_room.dart
+//
+// Layout: поля рядом — слева «Мой флот», справа «Поле соперника»
+// Адаптивно: ширина >= 600 → горизонталь, иначе → вертикально
 
 import 'dart:async';
 import 'dart:math';
@@ -6,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ── Константы (те же что в battleship_ai.dart) ────────────────────────────────
 const int _kSize  = 10;
 const int _kTotal = 100;
 const List<int> _kShips = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1];
@@ -48,8 +50,12 @@ class _BattleshipRoomScreenState extends State<BattleshipRoomScreen> {
 
     setState(() => _loading = false);
     if (!mounted) return;
-    Navigator.pushReplacement(context,
-        MaterialPageRoute(builder: (_) => _BSWaitingScreen(code: code, isHost: true)));
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _BSWaitingScreen(code: code, isHost: true),
+      ),
+    );
   }
 
   Future<void> _joinRoom() async {
@@ -68,8 +74,12 @@ class _BattleshipRoomScreenState extends State<BattleshipRoomScreen> {
 
     setState(() => _loading = false);
     if (!mounted) return;
-    Navigator.pushReplacement(context,
-        MaterialPageRoute(builder: (_) => BattleshipOnlineGame(roomId: code, isHost: false)));
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BattleshipOnlineGame(roomId: code, isHost: false),
+      ),
+    );
   }
 
   @override
@@ -82,109 +92,109 @@ class _BattleshipRoomScreenState extends State<BattleshipRoomScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D2137),
         leading: BackButton(color: Colors.white54),
-        title: const Text('Морской бой с другом',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Морской бой с другом',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-        child: Column(children: [
-          const SizedBox(height: 24),
-          Container(
-            width: 90, height: 90,
-            decoration: BoxDecoration(
-              color: const Color(0xFF5B8DEF).withOpacity(0.13),
-              shape: BoxShape.circle,
+        child: Column(
+          children: [
+            const SizedBox(height: 24),
+            Container(
+              width: 90, height: 90,
+              decoration: BoxDecoration(
+                color: const Color(0xFF5B8DEF).withOpacity(0.13),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(child: Text('⚓', style: TextStyle(fontSize: 46))),
             ),
-            child: const Center(child: Text('⚓', style: TextStyle(fontSize: 46))),
-          ),
-          const SizedBox(height: 28),
-
-          // Создать
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _loading ? null : _createRoom,
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Создать комнату', style: TextStyle(fontSize: 17)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF5B8DEF),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _loading ? null : _createRoom,
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text('Создать комнату', style: TextStyle(fontSize: 17)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5B8DEF),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
               ),
             ),
-          ),
-
-          const SizedBox(height: 24),
-          Row(children: [
-            const Expanded(child: Divider(color: Colors.white12)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text('или', style: TextStyle(color: Colors.white38, fontSize: 14)),
-            ),
-            const Expanded(child: Divider(color: Colors.white12)),
-          ]),
-          const SizedBox(height: 24),
-
-          // Поле кода
-          TextField(
-            controller: _ctrl,
-            textCapitalization: TextCapitalization.characters,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
-              LengthLimitingTextInputFormatter(6),
-            ],
-            style: const TextStyle(
+            const SizedBox(height: 24),
+            Row(children: [
+              const Expanded(child: Divider(color: Colors.white12)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text('или', style: TextStyle(color: Colors.white38, fontSize: 14)),
+              ),
+              const Expanded(child: Divider(color: Colors.white12)),
+            ]),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _ctrl,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                LengthLimitingTextInputFormatter(6),
+              ],
+              style: const TextStyle(
                 color: Colors.white, fontSize: 24,
-                fontWeight: FontWeight.bold, letterSpacing: 6),
-            textAlign: TextAlign.center,
-            decoration: InputDecoration(
-              hintText: 'XXXXXX',
-              hintStyle: const TextStyle(color: Colors.white24, fontSize: 24, letterSpacing: 6),
-              filled: true, fillColor: const Color(0xFF0D2137),
-              errorText: _error,
-              border: OutlineInputBorder(
+                fontWeight: FontWeight.bold, letterSpacing: 6,
+              ),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: 'XXXXXX',
+                hintStyle: const TextStyle(color: Colors.white24, fontSize: 24, letterSpacing: 6),
+                filled: true, fillColor: const Color(0xFF0D2137),
+                errorText: _error,
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFF5B8DEF), width: 1.5)),
-              enabledBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFF5B8DEF), width: 1.5),
+                ),
+                enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFF5B8DEF), width: 1.5)),
-              focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFF5B8DEF), width: 1.5),
+                ),
+                focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Colors.white54, width: 2)),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Войти
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _loading ? null : _joinRoom,
-              icon: const Icon(Icons.login_rounded),
-              label: const Text('Войти в комнату', style: TextStyle(fontSize: 17)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00C896),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  borderSide: const BorderSide(color: Colors.white54, width: 2),
+                ),
               ),
             ),
-          ),
-
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.only(top: 24),
-              child: CircularProgressIndicator(color: Color(0xFF5B8DEF)),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _loading ? null : _joinRoom,
+                icon: const Icon(Icons.login_rounded),
+                label: const Text('Войти в комнату', style: TextStyle(fontSize: 17)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00C896),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
             ),
-        ]),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.only(top: 24),
+                child: CircularProgressIndicator(color: Color(0xFF5B8DEF)),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ── Ожидание гостя (хост) ─────────────────────────────────────────────────────
+// ── Ожидание гостя ────────────────────────────────────────────────────────────
 
 class _BSWaitingScreen extends StatefulWidget {
   final String code;
@@ -207,16 +217,16 @@ class _BSWaitingScreenState extends State<_BSWaitingScreen> {
         .doc(widget.code)
         .snapshots()
         .listen((snap) {
-      // Гость присоединился если кто-то обновил p2_ready
-      // (логика: BattleshipOnlineGame при старте сразу открывает расстановку)
-      // Здесь просто переходим в игру
       if (!_guestJoined) {
         setState(() => _guestJoined = true);
         Future.delayed(const Duration(milliseconds: 800), () {
           if (mounted) {
-            Navigator.pushReplacement(context,
-                MaterialPageRoute(builder: (_) =>
-                    BattleshipOnlineGame(roomId: widget.code, isHost: true)));
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => BattleshipOnlineGame(roomId: widget.code, isHost: true),
+              ),
+            );
           }
         });
       }
@@ -236,13 +246,12 @@ class _BSWaitingScreenState extends State<_BSWaitingScreen> {
           const SizedBox(height: 24),
           const Text('Твоя комната', style: TextStyle(color: Colors.white54, fontSize: 16)),
           const SizedBox(height: 12),
-
-          // Код
           GestureDetector(
             onTap: () {
               Clipboard.setData(ClipboardData(text: widget.code));
               ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Код скопирован!')));
+                const SnackBar(content: Text('Код скопирован!')),
+              );
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
@@ -253,8 +262,9 @@ class _BSWaitingScreenState extends State<_BSWaitingScreen> {
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Text(widget.code, style: const TextStyle(
-                    color: Colors.white, fontSize: 36,
-                    fontWeight: FontWeight.w900, letterSpacing: 10)),
+                  color: Colors.white, fontSize: 36,
+                  fontWeight: FontWeight.w900, letterSpacing: 10,
+                )),
                 const SizedBox(width: 10),
                 const Icon(Icons.copy, color: Colors.white38, size: 20),
               ]),
@@ -264,19 +274,16 @@ class _BSWaitingScreenState extends State<_BSWaitingScreen> {
           const Text('Нажми чтобы скопировать',
               style: TextStyle(color: Colors.white24, fontSize: 12)),
           const SizedBox(height: 40),
-
           if (!_guestJoined) ...[
             const CircularProgressIndicator(color: Color(0xFF5B8DEF)),
             const SizedBox(height: 20),
-            const Text('Ожидаем друга...',
-                style: TextStyle(color: Colors.white54, fontSize: 16)),
+            const Text('Ожидаем друга...', style: TextStyle(color: Colors.white54, fontSize: 16)),
           ] else ...[
             const Icon(Icons.check_circle, color: Color(0xFF00C896), size: 48),
             const SizedBox(height: 12),
             const Text('Друг подключился! Начинаем...',
                 style: TextStyle(color: Color(0xFF00C896), fontSize: 16)),
           ],
-
           const SizedBox(height: 32),
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -294,7 +301,11 @@ class BattleshipOnlineGame extends StatefulWidget {
   final String roomId;
   final bool isHost;
 
-  const BattleshipOnlineGame({super.key, required this.roomId, required this.isHost});
+  const BattleshipOnlineGame({
+    super.key,
+    required this.roomId,
+    required this.isHost,
+  });
 
   @override
   State<BattleshipOnlineGame> createState() => _BattleshipOnlineGameState();
@@ -303,15 +314,15 @@ class BattleshipOnlineGame extends StatefulWidget {
 enum _OPhase { placing, battle, gameOver }
 
 class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
-  _OPhase _phase = _OPhase.placing;
-  bool _isReady = false;
-  bool _finished = false;
-  String _message = 'Расставь флот';
+  _OPhase _phase   = _OPhase.placing;
+  bool _isReady    = false;
+  bool _finished   = false;
+  String _message  = 'Расставь флот';
 
-  List<int> _myBoard = List.filled(_kTotal, _water);
+  List<int> _myBoard  = List.filled(_kTotal, _water);
   List<int> _oppBoard = List.filled(_kTotal, _water);
 
-  int _shipIdx = 0;
+  int _shipIdx  = 0;
   int? _firstCell;
 
   final Random _rng = Random();
@@ -403,9 +414,10 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
         final horiz = _rng.nextBool();
         final row = _rng.nextInt(_kSize - (horiz ? 0 : size - 1));
         final col = _rng.nextInt(_kSize - (horiz ? size - 1 : 0));
-        final cells = List.generate(size, (k) => horiz
-            ? row * _kSize + col + k
-            : (row + k) * _kSize + col);
+        final cells = List.generate(
+          size,
+              (k) => horiz ? row * _kSize + col + k : (row + k) * _kSize + col,
+        );
         if (_canPlace(board, cells)) {
           for (final c in cells) board[c] = _ship;
           placed = true;
@@ -413,24 +425,26 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
       }
     }
     setState(() {
-      _myBoard = board;
-      _shipIdx = _kShips.length;
-      _message = 'Нажми "Готов"!';
+      _myBoard  = board;
+      _shipIdx  = _kShips.length;
+      _message  = 'Нажми "Готов"!';
     });
     _pushMyBoard();
   }
 
   void _pushMyBoard() {
-    FirebaseFirestore.instance.collection('bs_rooms').doc(widget.roomId).update({
-      '${_myPrefix}_board': _myBoard,
-    });
+    FirebaseFirestore.instance
+        .collection('bs_rooms')
+        .doc(widget.roomId)
+        .update({'${_myPrefix}_board': _myBoard});
   }
 
   void _confirmReady() {
     setState(() { _isReady = true; _message = 'Ждём соперника...'; });
-    FirebaseFirestore.instance.collection('bs_rooms').doc(widget.roomId).update({
-      '${_myPrefix}_ready': true,
-    });
+    FirebaseFirestore.instance
+        .collection('bs_rooms')
+        .doc(widget.roomId)
+        .update({'${_myPrefix}_ready': true});
   }
 
   // ── Выстрел ──────────────────────────────────────────────────────────────
@@ -439,15 +453,14 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
     if (status != 'playing' || turn != _myTurnNum) return;
     if (opp[idx] == _miss || opp[idx] == _hit) return;
 
-    final newVal = opp[idx] == _ship ? _hit : _miss;
-    opp[idx] = newVal;
-
+    final newVal   = opp[idx] == _ship ? _hit : _miss;
+    opp[idx]       = newVal;
     final nextTurn = (newVal == _hit) ? turn : (turn == 1 ? 2 : 1);
 
-    FirebaseFirestore.instance.collection('bs_rooms').doc(widget.roomId).update({
-      '${_oppPrefix}_board': opp,
-      'turn': nextTurn,
-    });
+    FirebaseFirestore.instance
+        .collection('bs_rooms')
+        .doc(widget.roomId)
+        .update({'${_oppPrefix}_board': opp, 'turn': nextTurn});
   }
 
   // ── Победа ───────────────────────────────────────────────────────────────
@@ -476,8 +489,10 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D2137),
         leading: BackButton(color: Colors.white54),
-        title: Text('⚓ Комната: ${widget.roomId}',
-            style: const TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(
+          '⚓ Комната: ${widget.roomId}',
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
         centerTitle: true,
       ),
       body: StreamBuilder<DocumentSnapshot>(
@@ -487,10 +502,12 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
             .snapshots(),
         builder: (context, snap) {
           if (!snap.hasData || !snap.data!.exists) {
-            return const Center(child: CircularProgressIndicator(color: Colors.tealAccent));
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.tealAccent),
+            );
           }
 
-          final d = snap.data!.data() as Map<String, dynamic>;
+          final d       = snap.data!.data() as Map<String, dynamic>;
           final p1Board = List<int>.from(d['p1_board'] ?? List.filled(_kTotal, _water));
           final p2Board = List<int>.from(d['p2_board'] ?? List.filled(_kTotal, _water));
           final p1Ready = d['p1_ready'] ?? false;
@@ -502,8 +519,6 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
 
           final myBoard  = widget.isHost ? p1Board : p2Board;
           final oppBoard = widget.isHost ? p2Board : p1Board;
-
-          // Обновляем локальные борды
           _myBoard  = myBoard;
           _oppBoard = oppBoard;
 
@@ -511,7 +526,7 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
             _phase = _OPhase.battle;
           }
 
-          final String statusMsg = _phase == _OPhase.gameOver
+          final statusMsg = _phase == _OPhase.gameOver
               ? _message
               : status == 'waiting'
               ? (_isReady ? 'Ждём соперника...' : _message)
@@ -524,99 +539,239 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
             );
           }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Column(children: [
-              // Статус
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0D2137),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: Text(statusMsg, textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white, fontSize: 14)),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Поле врага
-              _SectionLabel(label: '🎯 Поле соперника', color: Colors.redAccent),
-              _OnlineGrid(
-                board: oppBoard,
-                hideShips: true,
-                onTap: (i) => _shoot(i, List<int>.from(oppBoard), turn, status),
-                enabled: status == 'playing' && turn == _myTurnNum,
-                firstSelected: null,
-              ),
-
-              const SizedBox(height: 12),
-
-              // Моё поле
-              _SectionLabel(
-                label: status == 'waiting' ? '🔧 Мой флот (расстановка)' : '⚓ Мой флот',
-                color: Colors.greenAccent,
-              ),
-              _OnlineGrid(
-                board: myBoard,
-                hideShips: false,
-                onTap: _onMyBoardTap,
-                enabled: status == 'waiting' && !_isReady,
-                firstSelected: _firstCell,
-              ),
-
-              // Кнопки
-              if (status == 'waiting' && !_isReady) ...[
-                const SizedBox(height: 12),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  ElevatedButton.icon(
-                    onPressed: _autoPlace,
-                    icon: const Icon(Icons.shuffle, size: 18),
-                    label: const Text('Случайно'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF5B8DEF),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: _shipIdx >= _kShips.length ? _confirmReady : null,
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('Готов!'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00C896),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ]),
-              ],
-
-              const SizedBox(height: 24),
-            ]),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 600;
+              return isWide
+                  ? _buildWide(constraints, myBoard, oppBoard, status, turn, statusMsg)
+                  : _buildNarrow(myBoard, oppBoard, status, turn, statusMsg);
+            },
           );
         },
       ),
     );
   }
+
+  // ── Широкий layout ────────────────────────────────────────────────────────
+
+  Widget _buildWide(
+      BoxConstraints constraints,
+      List<int> myBoard,
+      List<int> oppBoard,
+      String status,
+      int turn,
+      String statusMsg,
+      ) {
+    const hPad   = 16.0;
+    const gap    = 24.0;
+    final availW = constraints.maxWidth - hPad * 2 - gap;
+    final gridSize = (availW / 2).clamp(0.0, 420.0);
+
+    return Column(
+      children: [
+        _StatusBar(message: statusMsg),
+        const SizedBox(height: 6),
+
+        // Кнопки расстановки
+        if (status == 'waiting' && !_isReady)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: hPad, vertical: 4),
+            child: Row(children: [
+              ElevatedButton.icon(
+                onPressed: _autoPlace,
+                icon: const Icon(Icons.shuffle, size: 16),
+                label: const Text('Случайно'),
+                style: _btnStyle(const Color(0xFF5B8DEF)),
+              ),
+              const SizedBox(width: 10),
+              ElevatedButton.icon(
+                onPressed: _shipIdx >= _kShips.length ? _confirmReady : null,
+                icon: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text('Готов!'),
+                style: _btnStyle(const Color(0xFF00C896)),
+              ),
+            ]),
+          )
+        else
+          const SizedBox(height: 44),
+
+        const SizedBox(height: 4),
+
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: hPad),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Слева — МОЙ флот
+              _BoardPanel(
+                label: status == 'waiting' ? '🔧 Мой флот' : '⚓ Мой флот',
+                labelColor: Colors.greenAccent,
+                size: gridSize,
+                board: myBoard,
+                hideShips: false,
+                enabled: status == 'waiting' && !_isReady,
+                onTap: _onMyBoardTap,
+                firstSelected: _firstCell,
+              ),
+
+              const SizedBox(width: gap),
+
+              // Справа — ПОЛЕ СОПЕРНИКА
+              _BoardPanel(
+                label: '🎯 Поле соперника',
+                labelColor: Colors.redAccent,
+                size: gridSize,
+                board: oppBoard,
+                hideShips: true,
+                enabled: status == 'playing' && turn == _myTurnNum,
+                onTap: (i) => _shoot(i, List<int>.from(oppBoard), turn, status),
+                firstSelected: null,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Узкий layout ──────────────────────────────────────────────────────────
+
+  Widget _buildNarrow(
+      List<int> myBoard,
+      List<int> oppBoard,
+      String status,
+      int turn,
+      String statusMsg,
+      ) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(children: [
+        _StatusBar(message: statusMsg),
+        const SizedBox(height: 8),
+
+        _SectionLabel(label: '🎯 Поле соперника', color: Colors.redAccent),
+        _Grid(
+          board: oppBoard,
+          hideShips: true,
+          onTap: (i) => _shoot(i, List<int>.from(oppBoard), turn, status),
+          enabled: status == 'playing' && turn == _myTurnNum,
+          firstSelected: null,
+        ),
+
+        const SizedBox(height: 12),
+
+        _SectionLabel(
+          label: status == 'waiting' ? '🔧 Мой флот (расстановка)' : '⚓ Мой флот',
+          color: Colors.greenAccent,
+        ),
+        _Grid(
+          board: myBoard,
+          hideShips: false,
+          onTap: _onMyBoardTap,
+          enabled: status == 'waiting' && !_isReady,
+          firstSelected: _firstCell,
+        ),
+
+        if (status == 'waiting' && !_isReady) ...[
+          const SizedBox(height: 12),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            ElevatedButton.icon(
+              onPressed: _autoPlace,
+              icon: const Icon(Icons.shuffle, size: 18),
+              label: const Text('Случайно'),
+              style: _btnStyle(const Color(0xFF5B8DEF)),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: _shipIdx >= _kShips.length ? _confirmReady : null,
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+              label: const Text('Готов!'),
+              style: _btnStyle(const Color(0xFF00C896)),
+            ),
+          ]),
+        ],
+
+        const SizedBox(height: 24),
+      ]),
+    );
+  }
+
+  ButtonStyle _btnStyle(Color bg) => ElevatedButton.styleFrom(
+    backgroundColor: bg,
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  );
 }
 
-// ── Сетка онлайн ─────────────────────────────────────────────────────────────
+// ── Общие виджеты (Grid, Cell, Labels, StatusBar) ────────────────────────────
 
-class _OnlineGrid extends StatelessWidget {
+class _BoardPanel extends StatelessWidget {
+  final String label;
+  final Color labelColor;
+  final double size;
   final List<int> board;
   final bool hideShips, enabled;
   final Function(int) onTap;
   final int? firstSelected;
 
-  const _OnlineGrid({
+  const _BoardPanel({
+    required this.label,
+    required this.labelColor,
+    required this.size,
+    required this.board,
+    required this.hideShips,
+    required this.enabled,
+    required this.onTap,
+    required this.firstSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 26,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: labelColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        SizedBox(
+          width: size,
+          height: size,
+          child: GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _kSize,
+            ),
+            itemCount: _kTotal,
+            itemBuilder: (_, i) => _Cell(
+              value: board[i],
+              hideShip: hideShips,
+              isSelected: firstSelected == i,
+              onTap: enabled ? () => onTap(i) : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Grid extends StatelessWidget {
+  final List<int> board;
+  final bool hideShips, enabled;
+  final Function(int) onTap;
+  final int? firstSelected;
+
+  const _Grid({
     required this.board,
     required this.hideShips,
     required this.enabled,
@@ -631,43 +786,91 @@ class _OnlineGrid extends StatelessWidget {
       width: size, height: size,
       child: GridView.builder(
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: _kSize),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _kSize,
+        ),
         itemCount: _kTotal,
-        itemBuilder: (_, i) {
-          final val = board[i];
-          Color bg;
-          Widget child = const SizedBox();
+        itemBuilder: (_, i) => _Cell(
+          value: board[i],
+          hideShip: hideShips,
+          isSelected: firstSelected == i,
+          onTap: enabled ? () => onTap(i) : null,
+        ),
+      ),
+    );
+  }
+}
 
-          if (val == _ship && !hideShips) {
-            bg = const Color(0xFF4A5568);
-          } else if (val == _hit) {
-            bg = const Color(0xFFE53E3E);
-            child = const Icon(Icons.local_fire_department, color: Colors.white, size: 12);
-          } else if (val == _miss) {
-            bg = const Color(0xFF2D5A8E);
-            child = const Icon(Icons.close, color: Colors.white54, size: 10);
-          } else {
-            bg = const Color(0xFF1A3A5C);
-          }
+class _Cell extends StatelessWidget {
+  final int value;
+  final bool hideShip, isSelected;
+  final VoidCallback? onTap;
 
-          final sel = firstSelected == i;
-          if (sel) bg = const Color(0xFF48BB78);
+  const _Cell({
+    required this.value,
+    required this.hideShip,
+    required this.isSelected,
+    required this.onTap,
+  });
 
-          return GestureDetector(
-            onTap: enabled ? () => onTap(i) : null,
-            child: Container(
-              margin: const EdgeInsets.all(0.8),
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: BorderRadius.circular(1),
-                border: Border.all(
-                    color: sel ? Colors.greenAccent : Colors.black26,
-                    width: sel ? 1.5 : 0.5),
-              ),
-              child: Center(child: child),
-            ),
-          );
-        },
+  @override
+  Widget build(BuildContext context) {
+    Color bg;
+    Widget child = const SizedBox();
+
+    if (value == _ship && !hideShip) {
+      bg = const Color(0xFF4A5568);
+    } else if (value == _hit) {
+      bg = const Color(0xFFE53E3E);
+      child = const Icon(Icons.local_fire_department, color: Colors.white, size: 10);
+    } else if (value == _miss) {
+      bg = const Color(0xFF2D5A8E);
+      child = const Icon(Icons.close, color: Colors.white54, size: 8);
+    } else {
+      bg = const Color(0xFF1A3A5C);
+    }
+
+    if (isSelected) bg = const Color(0xFF48BB78);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.all(0.7),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(1.5),
+          border: Border.all(
+            color: isSelected ? Colors.greenAccent : Colors.black26,
+            width: isSelected ? 1.5 : 0.5,
+          ),
+        ),
+        child: Center(child: child),
+      ),
+    );
+  }
+}
+
+class _StatusBar extends StatelessWidget {
+  final String message;
+  const _StatusBar({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D2137),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+        ),
       ),
     );
   }
@@ -682,11 +885,20 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Text(label, style: TextStyle(
-          color: color, fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 15,
+          letterSpacing: 1,
+        ),
+      ),
     );
   }
 }
+
+// ── Online Game Over ──────────────────────────────────────────────────────────
 
 class _OnlineGameOver extends StatelessWidget {
   final String result;
@@ -702,9 +914,14 @@ class _OnlineGameOver extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(iWon ? '🏆' : '💀', style: const TextStyle(fontSize: 80)),
           const SizedBox(height: 16),
-          Text(result, style: TextStyle(
-              fontSize: 28, fontWeight: FontWeight.w900,
-              color: iWon ? const Color(0xFFFFD700) : const Color(0xFFFF3D3D))),
+          Text(
+            result,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              color: iWon ? const Color(0xFFFFD700) : const Color(0xFFFF3D3D),
+            ),
+          ),
           const SizedBox(height: 40),
           ElevatedButton(
             onPressed: onExit,
