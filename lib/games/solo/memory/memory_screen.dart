@@ -6,9 +6,9 @@ import '../../../widgets/win_dialog.dart';
 
 void win(BuildContext context) {
   CoinService.addCoins(10);
-
   showWinDialog(context);
 }
+
 class MemoryScreen extends StatefulWidget {
   const MemoryScreen({super.key});
 
@@ -35,7 +35,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   void checkWin() {
     if (revealed.every((e) => e)) {
       Future.delayed(const Duration(milliseconds: 300), () {
-        showWinDialog(context);
+        win(context); // ✅ теперь даёт монеты + диалог
       });
     }
   }
@@ -69,57 +69,123 @@ class _MemoryScreenState extends State<MemoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: const Color(0xFF0F172A),
 
       appBar: AppBar(
-        title: const Text("ПАМЯТЬ"),
-        backgroundColor: Colors.blue,
+        title: const Text("Игра на память"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
       ),
 
       body: Padding(
         padding: const EdgeInsets.all(16),
 
-        child: GridView.builder(
-          itemCount: cards.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-          ),
+        child: Column(
+          children: [
 
-          itemBuilder: (context, index) {
-            return GestureDetector(
-              onTap: () => onTap(index),
-
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-
-                decoration: BoxDecoration(
-                  gradient: revealed[index]
-                      ? const LinearGradient(
-                      colors: [Colors.white, Colors.grey])
-                      : const LinearGradient(
-                      colors: [Colors.blue, Colors.lightBlueAccent]),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      blurRadius: 6,
-                      color: Colors.black.withOpacity(0.2),
-                    )
-                  ],
+            /// 🔥 ЗАГОЛОВОК
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                 ),
-
-                child: Center(
-                  child: revealed[index]
-                      ? Text(
-                    cards[index],
-                    style: const TextStyle(fontSize: 28),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.purple.withOpacity(0.5),
+                    blurRadius: 20,
                   )
-                      : const Icon(Icons.help, color: Colors.white),
+                ],
+              ),
+              child: const Center(
+                child: Text(
+                  "Найди пары",
+                  style: TextStyle(
+                    fontSize: 24,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            );
-          },
+            ),
+
+            const SizedBox(height: 20),
+
+            /// 🎮 ПОЛЕ
+            Expanded(
+              child: GridView.builder(
+                itemCount: cards.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+
+                itemBuilder: (context, index) {
+                  return GestureDetector(
+                    onTap: () => onTap(index),
+
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+
+                      decoration: BoxDecoration(
+                        gradient: revealed[index]
+                            ? const LinearGradient(
+                          colors: [
+                            Color(0xFF1E293B),
+                            Color(0xFF334155)
+                          ],
+                        )
+                            : const LinearGradient(
+                          colors: [
+                            Color(0xFF0EA5E9),
+                            Color(0xFF3B82F6)
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.08),
+                        ),
+
+                        boxShadow: [
+                          BoxShadow(
+                            blurRadius: 10,
+                            color: Colors.black.withOpacity(0.6),
+                            offset: const Offset(0, 6),
+                          )
+                        ],
+                      ),
+
+                      child: Center(
+                        child: revealed[index]
+                            ? Text(
+                          cards[index],
+                          style: const TextStyle(fontSize: 30),
+                        )
+                            : const Icon(
+                          Icons.help_outline,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            /// 💡 ПОДСКАЗКА
+            Text(
+              "Открывай карточки и находи пары",
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+              ),
+            ),
+          ],
         ),
       ),
     );
