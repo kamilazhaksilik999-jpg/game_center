@@ -601,4 +601,4 @@ class _Segment {
   final Color color;
   final String emoji;
   const _Segment(this.label, this.coins, this.color, this.emoji);
-} //рофиль
+}
