@@ -8,6 +8,8 @@ import 'games/battleship_room.dart';
 import 'games/tug_of_war_ai.dart';
 import 'games/tug_of_war_room.dart';
 
+import 'games/mini_football_screen.dart';
+
 class OnlineGamesScreen extends StatefulWidget {
   final String selectedGame; // "tank" | "football" | "tug" | "seabattle"
   final String selectedMode; // "ai"   | "random"   | "room"
@@ -104,6 +106,27 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
             break;
         }
         break;
+
+    /// ⚽ ФУТБОЛ
+      case 'football':
+        switch (widget.selectedMode) {
+          case 'ai':
+          case 'random':
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const FootballGameScreen()),
+            );
+            break;
+
+          case 'room':
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const FootballGameScreen()),
+            );
+            break;
+        }
+        break;
+
 
     /// 🚧 ОСТАЛЬНЫЕ ИГРЫ
       default:

@@ -1,5 +1,4 @@
 // lobby/online/games/battleship/battleship_screen.dart
-<<<<<<< HEAD
 // \\ывпфолывлф
 // СТРУКТУРА ФАЙЛОВ для морского боя:
 //   battleship_screen.dart   ← этот файл (главный экран, выбор режима)
@@ -13,14 +12,11 @@
 //       case 'room': → BattleshipRoomScreen()
 //       case 'random': → BattleshipAIScreen() // тоже ИИ
 //     }
-=======
 //
 // СТРУКТУРА ФАЙЛОВ:
 //   battleship_screen.dart   ← этот файл (выбор режима)
 //   battleship_ai.dart       ← игра против ИИ (поля рядом: слева ты, справа враг)
 //   battleship_room.dart     ← онлайн с другом (поля рядом: слева ты, справа враг)
-
->>>>>>> 2483214ae0e767f58d834eb5080cc0f4c3e8f190
 import 'package:flutter/material.dart';
 import 'battleship_ai_screen.dart';
 import 'battleship_room.dart';
