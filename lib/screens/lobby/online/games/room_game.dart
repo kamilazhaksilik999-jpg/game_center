@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // ВАЖНО: Здесь используется Firebase Firestore для синхронизации.
 // Добавь в pubspec.yaml:
-//   firebase_core: ^2.27.0
+//   firebase_core: ^2.27.0F
 //   cloud_firestore: ^4.17.0
 // И настрой Firebase проект через flutterfire configure.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ class _RoomGameScreenState extends State<RoomGameScreen> {
 
   // Генерируем 6-значный код комнаты
   String _generateCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const chars = '123456789';
     final rng = Random();
     return List.generate(6, (_) => chars[rng.nextInt(chars.length)]).join();
   }

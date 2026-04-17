@@ -519,7 +519,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
                   color: _segments[i].color,
                 ),
                 child: Align(
-                  alignment: Alignment.topCenter,
+                  alignment: const Alignment(0.2, -1),
                   child: Padding(
                     padding: const EdgeInsets.only(top: 28),
                     child: Transform.rotate(
@@ -602,3 +602,4 @@ class _Segment {
   final String emoji;
   const _Segment(this.label, this.coins, this.color, this.emoji);
 }
+//да
