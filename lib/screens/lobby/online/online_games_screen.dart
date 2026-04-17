@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'games/ai_game.dart';
 import 'games/room_game.dart';
 
-// ✅ ДОБАВИЛ
 import 'games/battleship_ai_screen.dart';
 import 'games/battleship_room.dart';
+
+import 'games/tug_of_war_ai.dart';
+import 'games/tug_of_war_room.dart';
 
 class OnlineGamesScreen extends StatefulWidget {
   final String selectedGame; // "tank" | "football" | "tug" | "seabattle"
@@ -72,6 +74,32 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => const BattleshipRoomScreen()),
+            );
+            break;
+        }
+        break;
+
+    /// 🪢 ПЕРЕТЯНИ КАНАТ
+      case 'tug':
+        switch (widget.selectedMode) {
+          case 'ai':
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const TugOfWarAIScreen()),
+            );
+            break;
+
+          case 'random':
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const TugOfWarAIScreen()),
+            );
+            break;
+
+          case 'room':
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const TugOfWarRoomScreen()),
             );
             break;
         }
