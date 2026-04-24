@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// 🏠 главный экран
 import 'screens/home/home_screen.dart';
@@ -17,23 +18,18 @@ import 'screens/spin_wheel_screen.dart';
 /// 🛒 ДОБАВИЛ МАГАЗИН
 import 'screens/shop/shop_screen.dart';
 
-/// 🔥 ДОБАВИЛ FIREBASE
+/// 🔥 FIREBASE
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'screens/profile/profile_screen.dart';
-import 'screens/spin_wheel_screen.dart';
+import 'screens/auth/auth_screen.dart'; // ← добавили
 
-/// 🔥 ДОБАВИЛ MAIN
+/// 🔥 MAIN
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyABnMg83_sAmB5MqqSVFqTEKmxXKJh072s",
-      appId: "1:984380938437:web:925a2e63c5f8f0005978ac",
-      messagingSenderId: "984380938437",
-      projectId: "game-center-b4d5c",
-      storageBucket: "game-center-b4d5c.firebasestorage.app",
-    ),
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
   runApp(const MyApp());
@@ -54,10 +50,26 @@ class MyApp extends StatelessWidget {
         "/": (context) => const HomeScreen(),
 
         /// 🧭 меню
-        "/shop": (context) => const ShopScreen(), // ✅ РАБОЧИЙ МАГАЗИН
+        "/shop": (context) => const ShopScreen(),
         "/lobby": (context) =>
         const Scaffold(body: Center(child: Text("Lobby"))),
-        "/profile": (context) => const ProfileScreen(),
+
+        /// 🔥 ПРОФИЛЬ — проверяет авторизацию
+        "/profile": (context) => StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                backgroundColor: Color(0xFF1A1A2E),
+                body: Center(
+                    child: CircularProgressIndicator(color: Colors.orange)),
+              );
+            }
+            // Если вошёл — показываем профиль, иначе — экран входа
+            if (snapshot.hasData) return const ProfileScreen();
+            return const AuthScreen();
+          },
+        ),
 
         /// 🎮 ИГРЫ
         "/diff_start": (context) => const DiffStartScreen(),

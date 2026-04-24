@@ -17,7 +17,6 @@
 //   battleship_screen.dart   ← этот файл (выбор режима)
 //   battleship_ai.dart       ← игра против ИИ (поля рядом: слева ты, справа враг)
 //   battleship_room.dart     ← онлайн с другом (поля рядом: слева ты, справа враг)
-
 import 'package:flutter/material.dart';
 import 'battleship_ai_screen.dart';
 import 'battleship_room.dart';
