@@ -1,37 +1,45 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CoinService {
-  static int coins = 0;
+  static final _db   = FirebaseFirestore.instance;
+  static final _auth = FirebaseAuth.instance;
+  static int _coins  = 0; // локальный кэш
 
-  /// 🔄 загрузка при старте
+  static String? get _uid => _auth.currentUser?.uid;
+
+  // 🔄 Загрузить монеты из Firebase
   static Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    coins = prefs.getInt("coins") ?? 1250;
+    if (_uid == null) return;
+    final doc = await _db.collection('users').doc(_uid).get();
+    _coins = (doc.data()?['coins'] ?? 0) as int;
   }
 
-  /// ➕ добавить монеты
+  // 📥 Получить текущий кэш (без запроса)
+  static int getCoins() => _coins;
+
+  // ➕ Добавить монеты
   static Future<void> addCoins(int amount) async {
-    coins += amount;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt("coins", coins);
+    if (_uid == null) return;
+    _coins += amount;
+    await _db.collection('users').doc(_uid).update({
+      'coins': FieldValue.increment(amount),
+    });
   }
 
-  /// ➖ НОВОЕ — убрать монеты
+  // ➖ Убрать монеты
   static Future<void> removeCoins(int amount) async {
-    coins -= amount;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt("coins", coins);
+    if (_uid == null) return;
+    _coins -= amount;
+    await _db.collection('users').doc(_uid).update({
+      'coins': FieldValue.increment(-amount),
+    });
   }
 
-  /// 📥 получить монеты (оставляем как есть)
-  static int getCoins() {
-    return coins;
-  }
-
-  /// 🔥 НОВОЕ — установить монеты (чтобы не было ошибки)
+  // 🔥 Установить монеты напрямую
   static Future<void> setCoins(int value) async {
-    coins = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt("coins", coins);
+    if (_uid == null) return;
+    _coins = value;
+    await _db.collection('users').doc(_uid).update({'coins': value});
   }
 }
