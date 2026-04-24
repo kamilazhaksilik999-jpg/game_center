@@ -1,5 +1,3 @@
-// lib/screens/shop/shop_controller.dart
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -28,9 +26,9 @@ class ShopController extends ChangeNotifier {
   final _db   = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  int coins = 0;
-  String message = '';
+  int coins     = 0;
   bool isLoading = false;
+  String message = '';
 
   List<ShopItem> items = [
     ShopItem(id: 'theme_galaxy',  name: "Новая тема",    desc: "Темная галактика", price: 300, image: "assets/palette.png"),
@@ -39,27 +37,25 @@ class ShopController extends ChangeNotifier {
     ShopItem(id: 'avatar_golden', name: "Аватар рамка",  desc: "Золотая",          price: 150, image: "assets/mask.png"),
   ];
 
-  // ─── Текущий userId ──────────────────────────────────────────────────────────
-  String? get _userId => _auth.currentUser?.uid;
+  String? get _uid => _auth.currentUser?.uid;
 
-  // ─── Загрузить монеты и покупки из Firebase ──────────────────────────────────
+  // 🔄 Загрузить монеты и покупки из Firebase
   Future<void> loadShop() async {
-    if (_userId == null) return;
+    if (_uid == null) return;
     isLoading = true;
     notifyListeners();
 
-    // 1. Монеты из документа пользователя
-    final userDoc = await _db.collection('users').doc(_userId).get();
+    // 1. Монеты из профиля пользователя
+    final userDoc = await _db.collection('users').doc(_uid).get();
     coins = (userDoc.data()?['coins'] ?? 0) as int;
 
-    // 2. Покупки из подколлекции
+    // 2. Купленные товары из подколлекции
     final purchasesSnap = await _db
         .collection('users')
-        .doc(_userId)
+        .doc(_uid)
         .collection('purchases')
         .get();
 
-    // Помечаем купленные товары
     final boughtIds = purchasesSnap.docs.map((e) => e.id).toSet();
     for (final item in items) {
       item.isBought = boughtIds.contains(item.id);
@@ -70,38 +66,24 @@ class ShopController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Купить товар (безопасная транзакция) ────────────────────────────────────
+  // 🛒 Купить товар — транзакция в Firebase
   Future<bool> buyItem(ShopItem item) async {
-    if (_userId == null) {
-      message = 'Не авторизован';
-      return false;
-    }
-    if (item.isBought) {
-      message = 'Уже куплено';
-      return false;
-    }
-    if (coins < item.price) {
-      message = 'Недостаточно монет';
-      return false;
-    }
+    if (_uid == null)      { message = 'Не авторизован'; return false; }
+    if (item.isBought)     { message = 'Уже куплено';    return false; }
+    if (coins < item.price){ message = 'Недостаточно монет'; return false; }
 
     try {
-      final userRef     = _db.collection('users').doc(_userId);
+      final userRef     = _db.collection('users').doc(_uid);
       final purchaseRef = userRef.collection('purchases').doc(item.id);
 
-      // Транзакция — либо всё, либо ничего
       await _db.runTransaction((tx) async {
-        final snap = await tx.get(userRef);
-        final currentCoins = (snap.data()?['coins'] ?? 0) as int;
+        final snap          = await tx.get(userRef);
+        final currentCoins  = (snap.data()?['coins'] ?? 0) as int;
 
-        if (currentCoins < item.price) {
-          throw Exception('Недостаточно монет');
-        }
+        if (currentCoins < item.price) throw Exception('Недостаточно монет');
 
-        // Списываем монеты
-        tx.update(userRef, {
-          'coins': currentCoins - item.price,
-        });
+        // Списываем монеты в Firebase
+        tx.update(userRef, {'coins': currentCoins - item.price});
 
         // Сохраняем покупку
         tx.set(purchaseRef, {
@@ -113,10 +95,10 @@ class ShopController extends ChangeNotifier {
       });
 
       // Обновляем локально
-      coins         -= item.price;
-      item.isBought  = true;
-      item.isActive  = true;
-      message        = 'Куплено! 🎉';
+      coins        -= item.price;
+      item.isBought = true;
+      item.isActive = true;
+      message       = 'Куплено! 🎉';
       notifyListeners();
       return true;
 

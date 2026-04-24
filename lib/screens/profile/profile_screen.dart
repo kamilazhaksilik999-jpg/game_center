@@ -45,7 +45,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  // ✅ Загрузка через Firebase Auth
+  // ✅ Загрузка через Firebase Auth + автоисправление coins
   Future<void> _loadUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -59,8 +59,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .doc(user.uid)
           .get();
       if (doc.exists && mounted) {
+        final data = Map<String, dynamic>.from(doc.data()!);
+
+        // ✅ Если поля coins нет — добавляем 100 (старые аккаунты)
+        if (!data.containsKey('coins')) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({'coins': 100});
+          data['coins'] = 100;
+        }
+
+        // ✅ Если поля leaderboardEligible нет — добавляем
+        if (!data.containsKey('leaderboardEligible')) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({'leaderboardEligible': false});
+          data['leaderboardEligible'] = false;
+        }
+
         setState(() {
-          _userData = Map<String, dynamic>.from(doc.data()!);
+          _userData = data;
           _isLoading = false;
         });
       } else {
@@ -356,7 +376,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _showSnack('$friendName удалён');
   }
 
-  // ✅ Выход через Firebase Auth
   Future<void> _logout() async {
     await _authService.logout();
   }
@@ -390,7 +409,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return _buildProfileScreen();
   }
 
-  // ══════ ПРОФИЛЬ ══════
   Widget _buildProfileScreen() {
     final data = _userData!;
     final String name = data['name'] ?? 'Player';
@@ -412,7 +430,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // ── Шапка ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.only(top: 60, bottom: 28),
@@ -478,7 +495,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            // ── Статистика ──
             Container(
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.symmetric(vertical: 20),
@@ -498,7 +514,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            // ── Повышение ранга ──
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Container(
@@ -565,7 +580,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 16),
 
-            // ── Выйти ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextButton(
