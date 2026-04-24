@@ -14,7 +14,6 @@ class LeaderboardScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFF020617),
-
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -28,20 +27,15 @@ class LeaderboardScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: provider.getLeaderboard(),
-
         builder: (context, snapshot) {
-
-          // ⏳ Загрузка
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(color: Colors.amber),
             );
           }
 
-          // ❌ Ошибка
           if (snapshot.hasError) {
             return Center(
               child: Column(
@@ -59,7 +53,6 @@ class LeaderboardScreen extends StatelessWidget {
             );
           }
 
-          // 📭 Пусто
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(
               child: Column(
@@ -85,11 +78,10 @@ class LeaderboardScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final data   = players[index].data();
               final userId = players[index].id;
-
               return LeaderboardTile(
                 player:        data,
                 index:         index,
-                isCurrentUser: userId == currentUserId, // 👈 подсвечивает тебя
+                isCurrentUser: userId == currentUserId,
               );
             },
           );

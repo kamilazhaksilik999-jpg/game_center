@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class LeaderboardTile extends StatelessWidget {
   final Map<String, dynamic> player;
   final int index;
-  final bool isCurrentUser; // 👈 подсвечиваем своё место
+  final bool isCurrentUser;
 
   const LeaderboardTile({
     super.key,
@@ -27,17 +27,17 @@ class LeaderboardTile extends StatelessWidget {
   }
 
   String get _initials {
-    final name = (player['displayName'] ?? 'P').toString().trim();
+    final name = (player['name'] ?? 'P').toString().trim();
     return name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').join().toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
-    final name      = (player['displayName'] ?? 'Player').toString();
-    final rating    = player['rating']     ?? 0;
-    final wins      = player['wins']       ?? 0;
-    final total     = player['totalGames'] ?? 0;
-    final winRate   = total > 0
+    final name    = (player['name']       ?? 'Player').toString();
+    final rating  = player['rating']      ?? 0;
+    final wins    = player['wins']        ?? 0;
+    final total   = player['totalGames']  ?? 0;
+    final winRate = total > 0
         ? ((wins / total) * 100).toStringAsFixed(0)
         : '0';
 
@@ -71,8 +71,6 @@ class LeaderboardTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-
-          // 🏅 МЕСТО
           SizedBox(
             width: 40,
             child: Text(
@@ -85,10 +83,7 @@ class LeaderboardTile extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ),
-
           const SizedBox(width: 12),
-
-          // 👤 АВАТАР
           CircleAvatar(
             backgroundColor: isCurrentUser
                 ? Colors.orange.withOpacity(0.4)
@@ -101,10 +96,7 @@ class LeaderboardTile extends StatelessWidget {
               ),
             ),
           ),
-
           const SizedBox(width: 12),
-
-          // 🧑 ИМЯ + статистика
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,10 +115,7 @@ class LeaderboardTile extends StatelessWidget {
                       const SizedBox(width: 6),
                       const Text(
                         '(Вы)',
-                        style: TextStyle(
-                          color: Colors.orange,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.orange, fontSize: 12),
                       ),
                     ]
                   ],
@@ -138,8 +127,6 @@ class LeaderboardTile extends StatelessWidget {
               ],
             ),
           ),
-
-          // 💰 РЕЙТИНГ
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
