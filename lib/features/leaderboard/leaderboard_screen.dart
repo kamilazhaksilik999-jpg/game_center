@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'leaderboard_provider.dart';
 import 'leaderboard_tile.dart';
-
+//ст
 class LeaderboardScreen extends StatelessWidget {
 
   LeaderboardScreen({super.key});
