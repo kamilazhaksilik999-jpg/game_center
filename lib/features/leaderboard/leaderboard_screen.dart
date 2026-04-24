@@ -4,9 +4,7 @@ import 'leaderboard_provider.dart';
 import 'leaderboard_tile.dart';
 //ст
 class LeaderboardScreen extends StatelessWidget {
-
   LeaderboardScreen({super.key});
-
   final LeaderboardProvider provider = LeaderboardProvider();
 
   @override
