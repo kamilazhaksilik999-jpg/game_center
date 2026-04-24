@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/models/level_model.dart';
+import '../../data/levels.dart';
+
 class FindDiffScreen extends StatefulWidget {
-
-
-
 
   final LevelModel level;
 
@@ -16,20 +15,23 @@ class FindDiffScreen extends StatefulWidget {
 class _FindDiffScreenState extends State<FindDiffScreen> {
 
   List<bool> found = [];
+  late LevelModel currentLevel;
+
+  final GlobalKey imageKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
-    found = List.generate(widget.level.differences.length, (_) => false);
+    currentLevel = widget.level;
+    found = List.generate(currentLevel.differences.length, (_) => false);
   }
 
   void tap(Offset pos, Size size) {
 
-    for (int i = 0; i < widget.level.differences.length; i++) {
+    for (int i = 0; i < currentLevel.differences.length; i++) {
 
-      final r = widget.level.differences[i];
+      final r = currentLevel.differences[i];
 
-      /// 💯 адаптация под экран
       final scaledRect = Rect.fromLTWH(
         r.left * size.width,
         r.top * size.height,
@@ -51,18 +53,40 @@ class _FindDiffScreenState extends State<FindDiffScreen> {
     }
   }
 
+  void nextLevel() {
+
+    final index = levels.indexWhere((l) => l.id == currentLevel.id);
+
+    if (index + 1 < levels.length) {
+
+      setState(() {
+        currentLevel = levels[index + 1];
+        found = List.generate(currentLevel.differences.length, (_) => false);
+      });
+
+    } else {
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("🎉 Ты прошла все уровни!")),
+      );
+
+      Navigator.pop(context);
+    }
+  }
+
   void win() {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("🎉 Победа"),
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text("🎉 Победа", style: TextStyle(color: Colors.white)),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              Navigator.pop(context);
+              nextLevel();
             },
-            child: const Text("OK"),
+            child: const Text("Дальше"),
           )
         ],
       ),
@@ -73,11 +97,45 @@ class _FindDiffScreenState extends State<FindDiffScreen> {
   Widget build(BuildContext context) {
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Найди отличия")),
+      backgroundColor: const Color(0xFF0F172A),
+
+      appBar: AppBar(
+        title: Text("Уровень ${currentLevel.id}"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+      ),
 
       body: Column(
         children: [
 
+          const SizedBox(height: 10),
+
+          /// 🔥 ПРОГРЕСС БАР
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Center(
+              child: Text(
+                "${found.where((e) => e).length} / ${found.length}",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          /// 🖼️ КАРТИНКИ
           Expanded(
             child: Row(
               children: [
@@ -85,54 +143,69 @@ class _FindDiffScreenState extends State<FindDiffScreen> {
                 Expanded(
                   child: GestureDetector(
                     onTapDown: (d) {
-                      final box = context.findRenderObject() as RenderBox;
+
+                      final box = imageKey.currentContext!.findRenderObject() as RenderBox;
                       final size = box.size;
 
                       tap(d.localPosition, size);
-                    },                    child: Stack(
-                      children: [
-                        Image.asset(widget.level.leftImage, fit: BoxFit.cover),
-                        ...drawCircles(),
-                      ],
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          key: imageKey,
+                          children: [
+                            Image.asset(currentLevel.image1, fit: BoxFit.cover),
+                            ...drawCircles(),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
 
                 Expanded(
-                  child: Image.asset(widget.level.rightImage, fit: BoxFit.cover),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset(currentLevel.image2, fit: BoxFit.cover),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              "${found.where((e) => e).length} / ${found.length}",
-              style: const TextStyle(fontSize: 18),
-            ),
-          )
         ],
       ),
     );
   }
 
   List<Widget> drawCircles() {
+
     List<Widget> list = [];
 
-    for (int i = 0; i < widget.level.differences.length; i++) {
+    final box = imageKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return list;
+
+    final size = box.size;
+
+    for (int i = 0; i < currentLevel.differences.length; i++) {
 
       if (found[i]) {
-        final r = widget.level.differences[i];
+
+        final r = currentLevel.differences[i];
 
         list.add(Positioned(
-          left: r.left,
-          top: r.top,
+          left: r.left * size.width,
+          top: r.top * size.height,
           child: Container(
-            width: r.width,
-            height: r.height,
+            width: r.width * size.width,
+            height: r.height * size.height,
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.red, width: 2),
+              border: Border.all(color: Colors.redAccent, width: 2),
+              borderRadius: BorderRadius.circular(6),
             ),
           ),
         ));

@@ -1,122 +1,92 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'leaderboard_provider.dart';
 import 'leaderboard_tile.dart';
 
 class LeaderboardScreen extends StatelessWidget {
-
   LeaderboardScreen({super.key});
 
-  final LeaderboardProvider provider =
-  LeaderboardProvider();
+  final LeaderboardProvider provider = LeaderboardProvider();
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = provider.currentUserId;
 
     return Scaffold(
-
-      backgroundColor:
-      const Color(0xff020617),
-
+      backgroundColor: const Color(0xFF020617),
       appBar: AppBar(
-
-        title:
-        const Text("Global Ranking"),
-
-        backgroundColor:
-        Colors.transparent,
-
+        backgroundColor: Colors.transparent,
         elevation: 0,
-
+        title: const Text(
+          "🌍 Мировой рейтинг",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        centerTitle: true,
       ),
-
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-
-        stream:
-        provider.getLeaderboard(),
-
+        stream: provider.getLeaderboard(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text("Ошибка: ${snapshot.error}"));
-          }
-
-          if (!snapshot.hasData) {
-            return Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.data!.docs.isEmpty) {
-            return Center(child: Text("Нет игроков 😢"));
-          }
-          /// ⏳ Loading
-          if (snapshot.connectionState ==
-              ConnectionState.waiting) {
-
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(color: Colors.amber),
             );
-
           }
 
-          /// ❌ Error
           if (snapshot.hasError) {
-
             return Center(
-              child: Text(
-                "Error: ${snapshot.error}",
-                style: const TextStyle(color: Colors.white),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    "Ошибка загрузки\n${snapshot.error}",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white54),
+                  ),
+                ],
               ),
             );
-
           }
 
-          /// 📭 Empty
-          if (!snapshot.hasData ||
-              snapshot.data!.docs.isEmpty) {
-
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(
-              child: Text(
-                "No players yet",
-                style: TextStyle(color: Colors.white),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text("😢", style: TextStyle(fontSize: 48)),
+                  SizedBox(height: 12),
+                  Text(
+                    "Пока никого нет\nСыграй первую игру!",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white54, fontSize: 16),
+                  ),
+                ],
               ),
             );
-
           }
 
-          final players =
-              snapshot.data!.docs;
+          final players = snapshot.data!.docs;
 
           return ListView.builder(
-
-            itemCount:
-            players.length,
-
-            itemBuilder:
-                (context, index) {
-
-              final player =
-              players[index].data();
-
+            padding: const EdgeInsets.only(top: 8, bottom: 32),
+            itemCount: players.length,
+            itemBuilder: (context, index) {
+              final data   = players[index].data();
+              final userId = players[index].id;
               return LeaderboardTile(
-
-                player:
-                player,
-
-                index:
-                index,
-
+                player:        data,
+                index:         index,
+                isCurrentUser: userId == currentUserId,
               );
-
             },
-
           );
-
         },
-
       ),
-
     );
-
   }
-
 }
