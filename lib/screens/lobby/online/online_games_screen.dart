@@ -55,7 +55,7 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
           case 'room':
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => const RoomGameScreen()),
+              MaterialPageRoute(builder: (_) => const TugOfWarRoomScreen()),
             );
             break;
         }
