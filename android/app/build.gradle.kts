@@ -2,8 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
-    // ❗ УБЕРИ эту строку, если НЕ используешь Firebase
-    // id("com.google.gms.google-services")
+    id("com.google.gms.google-services")  //добавила
 }
 
 android {
@@ -22,7 +21,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.game_center"
-        minSdk = flutter.minSdkVersion
+        minSdk = 23  // ← было flutter.minSdkVersion, заменить на 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
