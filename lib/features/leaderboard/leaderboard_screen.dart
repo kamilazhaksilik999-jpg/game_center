@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'leaderboard_provider.dart';
 import 'leaderboard_tile.dart';
-<<<<<<< HEAD
-//ст
-=======
 
->>>>>>> 6542301c3be05368ece585f9b0435e4c38613b56
 class LeaderboardScreen extends StatelessWidget {
   LeaderboardScreen({super.key});
+
   final LeaderboardProvider provider = LeaderboardProvider();
 
   @override
