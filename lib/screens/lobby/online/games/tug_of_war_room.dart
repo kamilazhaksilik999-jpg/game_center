@@ -7,10 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ── Константы ──────────────────────────────────────────────────────────────
-const int _kMaxPos  = 10;
+const int _kMaxPos  = 12;   // сколько тапов нужно до победы
 const int _kGameSec = 30;
 
-// ── Экран создания / входа ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// ЭКРАН СОЗДАНИЯ / ВХОДА
+// ══════════════════════════════════════════════════════════════════════════════
 
 class TugOfWarRoomScreen extends StatefulWidget {
   const TugOfWarRoomScreen({super.key});
@@ -19,10 +21,31 @@ class TugOfWarRoomScreen extends StatefulWidget {
   State<TugOfWarRoomScreen> createState() => _TugOfWarRoomScreenState();
 }
 
-class _TugOfWarRoomScreenState extends State<TugOfWarRoomScreen> {
+class _TugOfWarRoomScreenState extends State<TugOfWarRoomScreen>
+    with SingleTickerProviderStateMixin {
   final _ctrl = TextEditingController();
   String? _error;
   bool _loading = false;
+
+  late AnimationController _pulseCtrl;
+  late Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+        vsync: this, duration: const Duration(seconds: 2))
+      ..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.95, end: 1.05).animate(
+        CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   String _generateCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -35,21 +58,24 @@ class _TugOfWarRoomScreenState extends State<TugOfWarRoomScreen> {
     final code = _generateCode();
 
     await FirebaseFirestore.instance.collection('tow_rooms').doc(code).set({
-      'rope_pos':   0,          // -10..+10; отрицательное = победа p1
-      'p1_taps':    0,
-      'p2_taps':    0,
-      'p1_ready':   false,
-      'p2_ready':   false,
-      'status':     'waiting',  // waiting | countdown | playing | finished
-      'winner':     '',
-      'start_at':   null,
-      'created_at': FieldValue.serverTimestamp(),
+      'rope_pos':    0,
+      'p1_taps':     0,
+      'p2_taps':     0,
+      'p1_ready':    false,
+      'p2_ready':    false,
+      'p2_joined':   false,   // ← явный флаг входа гостя (как в battleship/football)
+      'status':      'waiting',
+      'winner':      '',
+      'start_at':    null,
+      'created_at':  FieldValue.serverTimestamp(),
     });
 
     setState(() => _loading = false);
     if (!mounted) return;
-    Navigator.pushReplacement(context,
-        MaterialPageRoute(builder: (_) => _TowWaitingScreen(code: code)));
+
+    Navigator.pushReplacement(context, MaterialPageRoute(
+      builder: (_) => _TowWaitingScreen(code: code),
+    ));
   }
 
   Future<void> _joinRoom() async {
@@ -65,137 +91,222 @@ class _TugOfWarRoomScreenState extends State<TugOfWarRoomScreen> {
         .doc(code)
         .get();
 
-    if (!doc.exists || doc['status'] != 'waiting') {
-      setState(() {
-        _error = 'Комната не найдена или уже занята';
-        _loading = false;
-      });
+    if (!doc.exists) {
+      setState(() { _error = 'Комната не найдена'; _loading = false; });
+      return;
+    }
+    final data = doc.data() as Map<String, dynamic>;
+    if (data['status'] != 'waiting') {
+      setState(() { _error = 'Игра уже началась или завершена'; _loading = false; });
+      return;
+    }
+    if (data['p2_joined'] == true) {
+      setState(() { _error = 'Комната уже заполнена'; _loading = false; });
       return;
     }
 
+    // Пометить гостя как вошедшего
+    await FirebaseFirestore.instance
+        .collection('tow_rooms')
+        .doc(code)
+        .update({'p2_joined': true});
+
     setState(() => _loading = false);
     if (!mounted) return;
-    Navigator.pushReplacement(context,
-        MaterialPageRoute(builder: (_) =>
-            TugOfWarOnlineGame(roomId: code, isHost: false)));
-  }
 
-  @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+    Navigator.pushReplacement(context, MaterialPageRoute(
+      builder: (_) => TugOfWarOnlineGame(roomId: code, isHost: false),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0A2E),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF2D1B4E),
-        leading: BackButton(color: Colors.white54),
-        title: const Text('Перетяни канат с другом',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-        child: Column(children: [
-          const SizedBox(height: 24),
-          Container(
-            width: 90, height: 90,
-            decoration: BoxDecoration(
-              color: const Color(0xFF7B5DEF).withOpacity(0.13),
-              shape: BoxShape.circle,
+      backgroundColor: const Color(0xFF0F0A1E),
+      body: Stack(
+        children: [
+          // Фон — анимированные круги
+          _AnimatedBackground(),
+
+          SafeArea(
+            child: Column(
+              children: [
+                // AppBar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white54, size: 20),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'ПЕРЕТЯНИ КАНАТ',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 3),
+                        ),
+                      ),
+                      const SizedBox(width: 48),
+                    ],
+                  ),
+                ),
+
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+                    child: Column(children: [
+                      const SizedBox(height: 20),
+
+                      // Логотип
+                      ScaleTransition(
+                        scale: _pulse,
+                        child: Container(
+                          width: 100, height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const RadialGradient(colors: [
+                              Color(0xFF9B6DFF),
+                              Color(0xFF5B2DEF),
+                            ]),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF7B4DEF).withOpacity(0.5),
+                                blurRadius: 30,
+                                spreadRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                              child: Text('🪢', style: TextStyle(fontSize: 50))),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Создать
+                      _TowButton(
+                        label: 'СОЗДАТЬ КОМНАТУ',
+                        icon: Icons.add_circle_outline_rounded,
+                        gradient: const LinearGradient(colors: [
+                          Color(0xFF9B6DFF), Color(0xFF5B2DEF)
+                        ]),
+                        glowColor: const Color(0xFF7B4DEF),
+                        onTap: _loading ? null : _createRoom,
+                      ),
+                      const SizedBox(height: 24),
+
+                      Row(children: [
+                        const Expanded(child: Divider(color: Colors.white12)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text('или',
+                              style: TextStyle(
+                                  color: Colors.white38, fontSize: 14)),
+                        ),
+                        const Expanded(child: Divider(color: Colors.white12)),
+                      ]),
+                      const SizedBox(height: 24),
+
+                      // Поле кода
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1040),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: const Color(0xFF7B4DEF).withOpacity(0.5),
+                              width: 1.5),
+                        ),
+                        child: TextField(
+                          controller: _ctrl,
+                          textCapitalization: TextCapitalization.characters,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                            LengthLimitingTextInputFormatter(6),
+                          ],
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 8),
+                          textAlign: TextAlign.center,
+                          decoration: InputDecoration(
+                            hintText: 'XXXXXX',
+                            hintStyle: const TextStyle(
+                                color: Colors.white24,
+                                fontSize: 28,
+                                letterSpacing: 8),
+                            border: InputBorder.none,
+                            counterText: '',
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 20),
+                          ),
+                        ),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: Colors.redAccent.withOpacity(0.4)),
+                          ),
+                          child: Text(_error!,
+                              style: const TextStyle(
+                                  color: Colors.redAccent, fontSize: 13)),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+
+                      // Войти
+                      _TowButton(
+                        label: 'ВОЙТИ В КОМНАТУ',
+                        icon: Icons.login_rounded,
+                        gradient: const LinearGradient(colors: [
+                          Color(0xFF00D4A0), Color(0xFF009B78)
+                        ]),
+                        glowColor: const Color(0xFF00C896),
+                        onTap: _loading ? null : _joinRoom,
+                      ),
+
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 24),
+                          child: CircularProgressIndicator(
+                              color: Color(0xFF9B6DFF)),
+                        ),
+
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Один создаёт комнату, второй вводит код\nи жмёт как можно быстрее!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: Colors.white24,
+                            fontSize: 12,
+                            height: 1.6),
+                      ),
+                    ]),
+                  ),
+                ),
+              ],
             ),
-            child: const Center(child: Text('🪢', style: TextStyle(fontSize: 46))),
           ),
-          const SizedBox(height: 28),
-
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _loading ? null : _createRoom,
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Создать комнату', style: TextStyle(fontSize: 17)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7B5DEF),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          Row(children: [
-            const Expanded(child: Divider(color: Colors.white12)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text('или', style: TextStyle(color: Colors.white38, fontSize: 14)),
-            ),
-            const Expanded(child: Divider(color: Colors.white12)),
-          ]),
-          const SizedBox(height: 24),
-
-          TextField(
-            controller: _ctrl,
-            textCapitalization: TextCapitalization.characters,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
-              LengthLimitingTextInputFormatter(6),
-            ],
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 6),
-            textAlign: TextAlign.center,
-            decoration: InputDecoration(
-              hintText: 'XXXXXX',
-              hintStyle: const TextStyle(
-                  color: Colors.white24, fontSize: 24, letterSpacing: 6),
-              filled: true,
-              fillColor: const Color(0xFF2D1B4E),
-              errorText: _error,
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFF7B5DEF), width: 1.5)),
-              enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFF7B5DEF), width: 1.5)),
-              focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Colors.white54, width: 2)),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _loading ? null : _joinRoom,
-              icon: const Icon(Icons.login_rounded),
-              label: const Text('Войти в комнату', style: TextStyle(fontSize: 17)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00C896),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ),
-
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.only(top: 24),
-              child: CircularProgressIndicator(color: Color(0xFF7B5DEF)),
-            ),
-        ]),
+        ],
       ),
     );
   }
 }
 
-// ── Экран ожидания (только для хоста) ────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// ЭКРАН ОЖИДАНИЯ ХОСТА  (как _FootballWaitingScreen / _BSWaitingScreen)
+// ══════════════════════════════════════════════════════════════════════════════
 
 class _TowWaitingScreen extends StatefulWidget {
   final String code;
@@ -207,11 +318,12 @@ class _TowWaitingScreen extends StatefulWidget {
 
 class _TowWaitingScreenState extends State<_TowWaitingScreen> {
   StreamSubscription? _sub;
-  bool _joined = false;
+  bool _guestJoined = false;
 
   @override
   void initState() {
     super.initState();
+
     _sub = FirebaseFirestore.instance
         .collection('tow_rooms')
         .doc(widget.code)
@@ -219,15 +331,16 @@ class _TowWaitingScreenState extends State<_TowWaitingScreen> {
         .listen((snap) {
       if (!snap.exists) return;
       final d = snap.data() as Map<String, dynamic>;
-      // Гость пометит p2_ready=false (он вошёл в BattleshipOnlineGame)
-      // Для простоты: при первом снапшоте переходим в игру
-      if (!_joined) {
-        setState(() => _joined = true);
-        Future.delayed(const Duration(milliseconds: 600), () {
+      final joined = d['p2_joined'] as bool? ?? false;
+
+      if (joined && !_guestJoined) {
+        setState(() => _guestJoined = true);
+        Future.delayed(const Duration(milliseconds: 800), () {
           if (mounted) {
-            Navigator.pushReplacement(context,
-                MaterialPageRoute(builder: (_) =>
-                    TugOfWarOnlineGame(roomId: widget.code, isHost: true)));
+            Navigator.pushReplacement(context, MaterialPageRoute(
+              builder: (_) =>
+                  TugOfWarOnlineGame(roomId: widget.code, isHost: true),
+            ));
           }
         });
       }
@@ -235,75 +348,134 @@ class _TowWaitingScreenState extends State<_TowWaitingScreen> {
   }
 
   @override
-  void dispose() { _sub?.cancel(); super.dispose(); }
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _cancelRoom() async {
+    await FirebaseFirestore.instance
+        .collection('tow_rooms')
+        .doc(widget.code)
+        .delete();
+    if (mounted) Navigator.pop(context);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0A2E),
-      body: Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('🪢', style: TextStyle(fontSize: 64)),
-          const SizedBox(height: 24),
-          const Text('Твоя комната',
-              style: TextStyle(color: Colors.white54, fontSize: 16)),
-          const SizedBox(height: 12),
+      backgroundColor: const Color(0xFF0F0A1E),
+      body: Stack(
+        children: [
+          _AnimatedBackground(),
+          SafeArea(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('🪢', style: TextStyle(fontSize: 72)),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Твоя комната',
+                    style: TextStyle(color: Colors.white54, fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
 
-          GestureDetector(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: widget.code));
-              ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Код скопирован!')));
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2D1B4E),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF7B5DEF), width: 2),
+                  // Код — нажми чтобы скопировать
+                  GestureDetector(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: widget.code));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Код скопирован!')),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 36, vertical: 20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1040),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: const Color(0xFF9B6DFF), width: 2.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF7B4DEF).withOpacity(0.35),
+                            blurRadius: 24,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.code,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 42,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 10,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          const Icon(Icons.copy,
+                              color: Colors.white38, size: 22),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Нажми чтобы скопировать',
+                    style: TextStyle(color: Colors.white24, fontSize: 12),
+                  ),
+                  const SizedBox(height: 44),
+
+                  if (!_guestJoined) ...[
+                    const CircularProgressIndicator(
+                        color: Color(0xFF9B6DFF)),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Ожидаем друга...',
+                      style:
+                      TextStyle(color: Colors.white54, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Поделись кодом с другом',
+                      style: TextStyle(
+                          color: Colors.white24, fontSize: 13),
+                    ),
+                  ] else ...[
+                    const Icon(Icons.check_circle,
+                        color: Color(0xFF00C896), size: 52),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Друг подключился! Начинаем...',
+                      style: TextStyle(
+                          color: Color(0xFF00C896), fontSize: 16),
+                    ),
+                  ],
+
+                  const SizedBox(height: 36),
+                  TextButton(
+                    onPressed: _cancelRoom,
+                    child: const Text('Отмена',
+                        style: TextStyle(color: Colors.redAccent)),
+                  ),
+                ],
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(widget.code,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 10)),
-                const SizedBox(width: 10),
-                const Icon(Icons.copy, color: Colors.white38, size: 20),
-              ]),
             ),
           ),
-          const SizedBox(height: 8),
-          const Text('Нажми чтобы скопировать',
-              style: TextStyle(color: Colors.white24, fontSize: 12)),
-          const SizedBox(height: 40),
-
-          if (!_joined) ...[
-            const CircularProgressIndicator(color: Color(0xFF7B5DEF)),
-            const SizedBox(height: 20),
-            const Text('Ожидаем друга...',
-                style: TextStyle(color: Colors.white54, fontSize: 16)),
-          ] else ...[
-            const Icon(Icons.check_circle, color: Color(0xFF00C896), size: 48),
-            const SizedBox(height: 12),
-            const Text('Друг подключился!',
-                style: TextStyle(color: Color(0xFF00C896), fontSize: 16)),
-          ],
-
-          const SizedBox(height: 32),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена',
-                style: TextStyle(color: Colors.white38)),
-          ),
-        ]),
+        ],
       ),
     );
   }
 }
 
-// ── Онлайн игра ───────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// ОНЛАЙН ИГРА
+// ══════════════════════════════════════════════════════════════════════════════
 
 class TugOfWarOnlineGame extends StatefulWidget {
   final String roomId;
@@ -313,19 +485,18 @@ class TugOfWarOnlineGame extends StatefulWidget {
       {super.key, required this.roomId, required this.isHost});
 
   @override
-  State<TugOfWarOnlineGame> createState() => _TugOfWarOnlineGameState();
+  State<TugOfWarOnlineGame> createState() =>
+      _TugOfWarOnlineGameState();
 }
 
 enum _TOWPhase { waiting, countdown, playing, gameOver }
 
 class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
 
   _TOWPhase _localPhase = _TOWPhase.waiting;
-  bool _ready = false;
   bool _finished = false;
 
-  // Локально кэшируем данные из Firestore
   double _ropePos = 0;
   int _p1Taps = 0, _p2Taps = 0;
   int _countdown = 3;
@@ -335,25 +506,54 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
   Timer? _countdownTimer;
   Timer? _gameTimer;
 
+  // Анимация кнопки
   late AnimationController _tapCtrl;
-  late Animation<double> _tapScale;
+  late Animation<double> _tapAnim;
+
+  // Анимация встряски канат при тапе
+  late AnimationController _ropeShakeCtrl;
+  late Animation<double> _ropeShake;
+
+  // Анимация пульса кнопки
+  late AnimationController _btnPulseCtrl;
+  late Animation<double> _btnPulse;
+
+  // Анимация счётчика обратного отсчёта
+  late AnimationController _cdCtrl;
+  late Animation<double> _cdScale;
 
   String get _myTapsField  => widget.isHost ? 'p1_taps' : 'p2_taps';
   String get _myReadyField => widget.isHost ? 'p1_ready' : 'p2_ready';
+  DocumentReference get _roomRef =>
+      FirebaseFirestore.instance.collection('tow_rooms').doc(widget.roomId);
 
   @override
   void initState() {
     super.initState();
+
     _tapCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 100));
-    _tapScale = Tween<double>(begin: 1.0, end: 0.88).animate(
+        vsync: this, duration: const Duration(milliseconds: 90));
+    _tapAnim = Tween<double>(begin: 1.0, end: 0.82).animate(
         CurvedAnimation(parent: _tapCtrl, curve: Curves.easeOut));
 
-    // Пометить себя как готового
-    FirebaseFirestore.instance
-        .collection('tow_rooms')
-        .doc(widget.roomId)
-        .update({_myReadyField: true});
+    _ropeShakeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 200));
+    _ropeShake = Tween<double>(begin: 0, end: 6).animate(
+        CurvedAnimation(parent: _ropeShakeCtrl, curve: Curves.elasticOut));
+
+    _btnPulseCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700))
+      ..repeat(reverse: true);
+    _btnPulse = Tween<double>(begin: 1.0, end: 1.06).animate(
+        CurvedAnimation(parent: _btnPulseCtrl, curve: Curves.easeInOut));
+
+    _cdCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400));
+    _cdScale = Tween<double>(begin: 1.5, end: 1.0).animate(
+        CurvedAnimation(parent: _cdCtrl, curve: Curves.elasticOut));
+
+    // Пометить себя готовым
+    _roomRef.update({_myReadyField: true});
   }
 
   @override
@@ -361,15 +561,19 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
     _countdownTimer?.cancel();
     _gameTimer?.cancel();
     _tapCtrl.dispose();
+    _ropeShakeCtrl.dispose();
+    _btnPulseCtrl.dispose();
+    _cdCtrl.dispose();
     super.dispose();
   }
 
-  // ── Обработка снапшота ────────────────────────────────────────────────────
+  // ── Обработка снапшота ──────────────────────────────────────────────────
 
   void _handleSnapshot(Map<String, dynamic> d) {
     final status = d['status'] as String? ?? 'waiting';
     final p1Ready = d['p1_ready'] as bool? ?? false;
     final p2Ready = d['p2_ready'] as bool? ?? false;
+
     _ropePos = (d['rope_pos'] as num?)?.toDouble() ?? 0;
     _p1Taps  = (d['p1_taps'] as num?)?.toInt() ?? 0;
     _p2Taps  = (d['p2_taps'] as num?)?.toInt() ?? 0;
@@ -377,10 +581,7 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
 
     // Оба готовы → хост запускает обратный отсчёт
     if (p1Ready && p2Ready && status == 'waiting' && widget.isHost) {
-      FirebaseFirestore.instance
-          .collection('tow_rooms')
-          .doc(widget.roomId)
-          .update({'status': 'countdown'});
+      _roomRef.update({'status': 'countdown'});
     }
 
     if (status == 'countdown' && _localPhase == _TOWPhase.waiting) {
@@ -389,105 +590,85 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
     }
 
     if (status == 'playing' && _localPhase == _TOWPhase.countdown) {
-      setState(() { _localPhase = _TOWPhase.playing; });
+      _countdownTimer?.cancel();
+      setState(() {
+        _localPhase = _TOWPhase.playing;
+        _btnPulseCtrl.stop();
+      });
       _startGameTimer();
     }
 
     if (status == 'finished' && !_finished) {
       _finished = true;
-      setState(() { _localPhase = _TOWPhase.gameOver; });
+      _gameTimer?.cancel();
+      setState(() => _localPhase = _TOWPhase.gameOver);
     }
   }
 
   void _startCountdown() {
     _countdown = 3;
+    _cdCtrl.forward(from: 0);
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (_countdown <= 1) {
         t.cancel();
         if (widget.isHost) {
-          FirebaseFirestore.instance
-              .collection('tow_rooms')
-              .doc(widget.roomId)
-              .update({'status': 'playing'});
+          _roomRef.update({'status': 'playing'});
         }
       } else {
         setState(() => _countdown--);
+        _cdCtrl.forward(from: 0);
       }
     });
   }
 
   void _startGameTimer() {
     _timeLeft = _kGameSec;
+    _btnPulseCtrl.repeat(reverse: true);
     _gameTimer?.cancel();
     _gameTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (_timeLeft <= 1) {
         t.cancel();
         if (widget.isHost) _resolveTimeout();
       } else {
-        setState(() => _timeLeft--);
+        if (mounted) setState(() => _timeLeft--);
       }
     });
   }
 
   void _resolveTimeout() {
-    // Хост определяет победителя по rope_pos
-    FirebaseFirestore.instance
-        .collection('tow_rooms')
-        .doc(widget.roomId)
-        .get()
-        .then((snap) {
+    _roomRef.get().then((snap) {
       if (!snap.exists) return;
       final pos = (snap['rope_pos'] as num).toDouble();
-      final winner = pos < 0
-          ? 'p1'
-          : pos > 0
-          ? 'p2'
-          : 'draw';
-      FirebaseFirestore.instance
-          .collection('tow_rooms')
-          .doc(widget.roomId)
-          .update({'status': 'finished', 'winner': winner});
+      final winner = pos < 0 ? 'p1' : pos > 0 ? 'p2' : 'draw';
+      _roomRef.update({'status': 'finished', 'winner': winner});
     });
   }
 
-  // ── Тап игрока ───────────────────────────────────────────────────────────
+  // ── Тап ─────────────────────────────────────────────────────────────────
 
   void _onTap() {
     if (_localPhase != _TOWPhase.playing) return;
 
+    HapticFeedback.lightImpact();
     _tapCtrl.forward(from: 0).then((_) => _tapCtrl.reverse());
+    _ropeShakeCtrl.forward(from: 0);
 
-    // Изменение rope_pos: p1 (хост) тянет влево (−1), p2 тянет вправо (+1)
     final delta = widget.isHost ? -1 : 1;
 
-    FirebaseFirestore.instance
-        .collection('tow_rooms')
-        .doc(widget.roomId)
-        .update({
+    _roomRef.update({
       'rope_pos': FieldValue.increment(delta),
       _myTapsField: FieldValue.increment(1),
     }).then((_) {
-      // Проверяем победу
-      FirebaseFirestore.instance
-          .collection('tow_rooms')
-          .doc(widget.roomId)
-          .get()
-          .then((snap) {
+      _roomRef.get().then((snap) {
         if (!snap.exists || _finished) return;
         final pos = (snap['rope_pos'] as num).toDouble();
         if (pos <= -_kMaxPos) {
           _finished = true;
-          FirebaseFirestore.instance
-              .collection('tow_rooms')
-              .doc(widget.roomId)
-              .update({'status': 'finished', 'winner': 'p1'});
+          _roomRef.update({'status': 'finished', 'winner': 'p1'});
         } else if (pos >= _kMaxPos) {
           _finished = true;
-          FirebaseFirestore.instance
-              .collection('tow_rooms')
-              .doc(widget.roomId)
-              .update({'status': 'finished', 'winner': 'p2'});
+          _roomRef.update({'status': 'finished', 'winner': 'p2'});
         }
       });
     });
@@ -504,312 +685,780 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0A2E),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF2D1B4E),
-        leading: BackButton(color: Colors.white54),
-        title: Text('🪢 Комната: ${widget.roomId}',
-            style: const TextStyle(color: Colors.white, fontSize: 16)),
-        centerTitle: true,
+      backgroundColor: const Color(0xFF0F0A1E),
+      body: Stack(
+        children: [
+          _AnimatedBackground(),
+          SafeArea(
+            child: StreamBuilder<DocumentSnapshot>(
+              stream: _roomRef.snapshots(),
+              builder: (context, snap) {
+                if (!snap.hasData || !snap.data!.exists) {
+                  return const Center(
+                      child: CircularProgressIndicator(
+                          color: Color(0xFF9B6DFF)));
+                }
+
+                final d = snap.data!.data() as Map<String, dynamic>;
+                _handleSnapshot(d);
+
+                if (_localPhase == _TOWPhase.gameOver) {
+                  return _buildGameOver();
+                }
+
+                return Column(
+                  children: [
+                    _buildTopBar(),
+                    Expanded(child: _buildBody()),
+                    _buildTapButton(),
+                    const SizedBox(height: 36),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('tow_rooms')
-            .doc(widget.roomId)
-            .snapshots(),
-        builder: (context, snap) {
-          if (!snap.hasData || !snap.data!.exists) {
-            return const Center(
-                child: CircularProgressIndicator(color: Colors.purpleAccent));
-          }
+    );
+  }
 
-          final d = snap.data!.data() as Map<String, dynamic>;
-          _handleSnapshot(d);
+  // ── Верхняя панель ──────────────────────────────────────────────────────
 
-          if (_localPhase == _TOWPhase.gameOver) {
-            return _OnlineGameOver(
-              result: _resolveWinnerLabel(_winner),
-              onExit: () => Navigator.pop(context),
-            );
-          }
+  Widget _buildTopBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1040).withOpacity(0.9),
+        border: Border(
+            bottom: BorderSide(
+                color: const Color(0xFF9B6DFF).withOpacity(0.2))),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: Colors.white38, size: 18),
+            onPressed: () => Navigator.pop(context),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+          const SizedBox(width: 8),
 
-          return Column(
-            children: [
-              // Верхняя панель
-              _OnlineTopBar(
-                timeLeft: _timeLeft,
-                phase: _localPhase,
-                countdown: _countdown,
-                p1Taps: _p1Taps,
-                p2Taps: _p2Taps,
+          // P1
+          _PlayerTapCounter(
+            emoji: '🔴',
+            label: 'P1',
+            taps: _p1Taps,
+            color: const Color(0xFFFF5E78),
+            isMe: widget.isHost,
+          ),
+
+          const Spacer(),
+
+          // Таймер / обратный отсчёт
+          if (_localPhase == _TOWPhase.playing)
+            _TimerBadge(seconds: _timeLeft)
+          else if (_localPhase == _TOWPhase.countdown)
+            const Icon(Icons.timer, color: Colors.white38, size: 22)
+          else
+            const Text('🪢', style: TextStyle(fontSize: 22)),
+
+          const Spacer(),
+
+          // P2
+          _PlayerTapCounter(
+            emoji: '🟢',
+            label: 'P2',
+            taps: _p2Taps,
+            color: const Color(0xFF00D4A0),
+            isMe: !widget.isHost,
+          ),
+
+          const SizedBox(width: 8),
+          // Код комнаты
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: widget.roomId));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Код скопирован!')),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A1850),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: const Color(0xFF9B6DFF).withOpacity(0.4)),
               ),
+              child: Text(
+                widget.roomId,
+                style: const TextStyle(
+                    color: Color(0xFF9B6DFF),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-              const Spacer(),
+  // ── Центральная часть ────────────────────────────────────────────────────
 
-              // Статус
-              if (_localPhase == _TOWPhase.waiting)
-                const _StatusChip(text: '⏳ Ждём соперника...')
-              else if (_localPhase == _TOWPhase.countdown)
-                _CountdownBig(value: _countdown)
-              else ...[
-                  // Канат
-                  _RopeWidget(position: _ropePos, maxPos: _kMaxPos),
+  Widget _buildBody() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (_localPhase == _TOWPhase.waiting) ...[
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 28, vertical: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1040).withOpacity(0.7),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: const Column(
+              children: [
+                Text('⏳', style: TextStyle(fontSize: 40)),
+                SizedBox(height: 10),
+                Text('Ждём соперника...',
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600)),
+                SizedBox(height: 4),
+                Text('Оба игрока должны открыть игру',
+                    style: TextStyle(
+                        color: Colors.white30, fontSize: 12)),
+              ],
+            ),
+          ),
+        ] else if (_localPhase == _TOWPhase.countdown) ...[
+          ScaleTransition(
+            scale: _cdScale,
+            child: Text(
+              '$_countdown',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 120,
+                fontWeight: FontWeight.w900,
+                shadows: [
+                  Shadow(
+                      color: Color(0xFF9B6DFF), blurRadius: 40),
+                  Shadow(
+                      color: Color(0xFF9B6DFF), blurRadius: 80),
                 ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Готовься!',
+            style: TextStyle(
+                color: Colors.white54,
+                fontSize: 18,
+                letterSpacing: 4),
+          ),
+        ] else ...[
+          // Канат с маркером
+          const SizedBox(height: 20),
+          _buildRope(),
+          const SizedBox(height: 32),
+          // Мини-инфо
+          _buildMiniProgress(),
+        ],
+      ],
+    );
+  }
 
+  // ── Канат ────────────────────────────────────────────────────────────────
+
+  Widget _buildRope() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          // Метки сторон
+          Row(
+            children: [
+              _SideLabel(label: 'P1', color: const Color(0xFFFF5E78), arrow: '←'),
               const Spacer(),
+              _SideLabel(label: 'P2', color: const Color(0xFF00D4A0), arrow: '→', reversed: true),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-              // Кнопка
-              ScaleTransition(
-                scale: _tapScale,
-                child: GestureDetector(
-                  onTapDown: (_) => _onTap(),
-                  child: _BigTapButton(
-                    enabled: _localPhase == _TOWPhase.playing,
-                    isHost: widget.isHost,
+          // Сам канат
+          AnimatedBuilder(
+            animation: _ropeShake,
+            builder: (context, child) {
+              final shake = sin(_ropeShake.value * pi) *
+                  (widget.isHost ? -1 : 1) * 2;
+              return Transform.translate(
+                offset: Offset(0, shake),
+                child: child,
+              );
+            },
+            child: LayoutBuilder(builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final norm = (_ropePos + _kMaxPos) / (2 * _kMaxPos);
+              final markerX = norm.clamp(0.0, 1.0) * width;
+
+              return SizedBox(
+                height: 80,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    // Полоска канат
+                    Container(
+                      height: 20,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFFFF5E78),
+                            Color(0xFF4A2080),
+                            Color(0xFF00D4A0),
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                              color: const Color(0xFF9B6DFF)
+                                  .withOpacity(0.3),
+                              blurRadius: 12,
+                              spreadRadius: 2),
+                        ],
+                      ),
+                    ),
+
+                    // Центральная линия
+                    Center(
+                      child: Container(
+                        width: 3,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+
+                    // Маркер (узел канат)
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 100),
+                      curve: Curves.easeOut,
+                      left: markerX - 28,
+                      top: 10,
+                      child: _RopeKnot(
+                          pos: _ropePos, maxPos: _kMaxPos.toDouble()),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+
+          const SizedBox(height: 10),
+          // Победные зоны
+          Row(
+            children: [
+              _WinZone(label: '← Победа P1', color: const Color(0xFFFF5E78)),
+              const Spacer(),
+              _WinZone(label: 'Победа P2 →', color: const Color(0xFF00D4A0)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniProgress() {
+    final norm = (_ropePos + _kMaxPos) / (2 * _kMaxPos);
+    return Column(
+      children: [
+        Text(
+          _ropePos == 0
+              ? 'Равно!'
+              : _ropePos < 0
+              ? 'P1 тянет сильнее!'
+              : 'P2 тянет сильнее!',
+          style: TextStyle(
+            color: _ropePos == 0
+                ? Colors.white54
+                : _ropePos < 0
+                ? const Color(0xFFFF5E78)
+                : const Color(0xFF00D4A0),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Позиция: ${_ropePos.toInt() > 0 ? "+" : ""}${_ropePos.toInt()}',
+          style: const TextStyle(color: Colors.white24, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  // ── Кнопка тапа ─────────────────────────────────────────────────────────
+
+  Widget _buildTapButton() {
+    final enabled = _localPhase == _TOWPhase.playing;
+    final myColor =
+    widget.isHost ? const Color(0xFFFF5E78) : const Color(0xFF00D4A0);
+
+    return GestureDetector(
+      onTapDown: enabled ? (_) => _onTap() : null,
+      child: ScaleTransition(
+        scale: _tapAnim,
+        child: AnimatedBuilder(
+          animation: _btnPulse,
+          builder: (context, child) => Transform.scale(
+            scale: enabled ? _btnPulse.value : 1.0,
+            child: child,
+          ),
+          child: Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: enabled
+                  ? RadialGradient(colors: [
+                myColor.withOpacity(0.95),
+                myColor.withOpacity(0.55),
+              ])
+                  : const RadialGradient(colors: [
+                Color(0xFF2A1850),
+                Color(0xFF1A0A2E),
+              ]),
+              boxShadow: enabled
+                  ? [
+                BoxShadow(
+                    color: myColor.withOpacity(0.55),
+                    blurRadius: 40,
+                    spreadRadius: 8),
+                BoxShadow(
+                    color: myColor.withOpacity(0.25),
+                    blurRadius: 80,
+                    spreadRadius: 16),
+              ]
+                  : [],
+              border: Border.all(
+                color: enabled
+                    ? myColor.withOpacity(0.6)
+                    : Colors.white12,
+                width: 2.5,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  enabled ? '💪' : '⏳',
+                  style: const TextStyle(fontSize: 52),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  enabled ? 'ТЯНИ!' : 'Жди...',
+                  style: TextStyle(
+                    color: enabled ? Colors.white : Colors.white38,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                    letterSpacing: 3,
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 48),
-            ],
-          );
-        },
+              ],
+            ),
+          ),
+        ),
       ),
+    );
+  }
+
+  // ── Экран победы ─────────────────────────────────────────────────────────
+
+  Widget _buildGameOver() {
+    final label = _resolveWinnerLabel(_winner);
+    final iWon = label.contains('Ты победил');
+    final isDraw = label.contains('Ничья');
+    final color = isDraw
+        ? Colors.orange
+        : iWon
+        ? const Color(0xFFFFD700)
+        : const Color(0xFFFF5E78);
+
+    return Stack(
+      children: [
+        _AnimatedBackground(),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isDraw ? '🤝' : iWon ? '🏆' : '💀',
+                style: const TextStyle(fontSize: 88),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                label,
+                style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                    letterSpacing: 2,
+                    shadows: [
+                      Shadow(color: color.withOpacity(0.5), blurRadius: 30)
+                    ]),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'P1: $_p1Taps тапов  •  P2: $_p2Taps тапов',
+                style: const TextStyle(
+                    color: Colors.white38, fontSize: 14),
+              ),
+              const SizedBox(height: 48),
+              _TowButton(
+                label: 'В МЕНЮ',
+                icon: Icons.home_rounded,
+                gradient: const LinearGradient(colors: [
+                  Color(0xFF9B6DFF), Color(0xFF5B2DEF)
+                ]),
+                glowColor: const Color(0xFF7B4DEF),
+                onTap: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
-// ── Вспомогательные виджеты ──────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// ВСПОМОГАТЕЛЬНЫЕ ВИДЖЕТЫ
+// ══════════════════════════════════════════════════════════════════════════════
 
-class _OnlineTopBar extends StatelessWidget {
-  final int timeLeft, countdown, p1Taps, p2Taps;
-  final _TOWPhase phase;
+class _PlayerTapCounter extends StatelessWidget {
+  final String emoji, label;
+  final int taps;
+  final Color color;
+  final bool isMe;
 
-  const _OnlineTopBar({
-    required this.timeLeft,
-    required this.phase,
-    required this.countdown,
-    required this.p1Taps,
-    required this.p2Taps,
+  const _PlayerTapCounter({
+    required this.emoji,
+    required this.label,
+    required this.taps,
+    required this.color,
+    required this.isMe,
   });
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 4),
+            Text(
+              label + (isMe ? ' (ты)' : ''),
+              style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '$taps 👊',
+          style: const TextStyle(color: Colors.white54, fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+class _TimerBadge extends StatelessWidget {
+  final int seconds;
+  const _TimerBadge({required this.seconds});
+
+  @override
+  Widget build(BuildContext context) {
+    final urgent = seconds <= 10;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-      color: const Color(0xFF2D1B4E),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: urgent
+            ? const Color(0xFFFF5E78).withOpacity(0.15)
+            : const Color(0xFF2A1850),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: urgent
+              ? const Color(0xFFFF5E78).withOpacity(0.6)
+              : Colors.white12,
+        ),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Column(children: [
-            const Text('👤 P1',
-                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-            Text('$p1Taps 👊',
-                style: const TextStyle(color: Colors.white70, fontSize: 13)),
-          ]),
-          phase == _TOWPhase.playing
-              ? Row(children: [
-            const Icon(Icons.timer, color: Colors.white54, size: 18),
-            const SizedBox(width: 6),
-            Text('$timeLeft с',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold)),
-          ])
-              : const Text('🪢',
-              style: TextStyle(fontSize: 28)),
-          Column(children: [
-            const Text('👤 P2',
-                style: TextStyle(color: Color(0xFF00C896), fontWeight: FontWeight.bold)),
-            Text('$p2Taps 👊',
-                style: const TextStyle(color: Colors.white70, fontSize: 13)),
-          ]),
+          Icon(Icons.timer,
+              color: urgent ? const Color(0xFFFF5E78) : Colors.white54,
+              size: 16),
+          const SizedBox(width: 4),
+          Text(
+            '$seconds с',
+            style: TextStyle(
+              color: urgent ? const Color(0xFFFF5E78) : Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _CountdownBig extends StatelessWidget {
-  final int value;
-  const _CountdownBig({required this.value});
+class _RopeKnot extends StatelessWidget {
+  final double pos, maxPos;
+  const _RopeKnot({required this.pos, required this.maxPos});
+
+  @override
+  Widget build(BuildContext context) {
+    final urgency = pos.abs() / maxPos;
+    final knobColor = pos < 0
+        ? Color.lerp(Colors.white, const Color(0xFFFF5E78), urgency)!
+        : pos > 0
+        ? Color.lerp(Colors.white, const Color(0xFF00D4A0), urgency)!
+        : Colors.white;
+
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: knobColor,
+        border: Border.all(color: const Color(0xFF9B6DFF), width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: knobColor.withOpacity(0.6),
+            blurRadius: 16,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: const Center(
+          child: Text('🪢', style: TextStyle(fontSize: 24))),
+    );
+  }
+}
+
+class _SideLabel extends StatelessWidget {
+  final String label, arrow;
+  final Color color;
+  final bool reversed;
+
+  const _SideLabel({
+    required this.label,
+    required this.color,
+    required this.arrow,
+    this.reversed = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = reversed ? '$label $arrow' : '$arrow $label';
+    return Text(
+      text,
+      style: TextStyle(
+        color: color.withOpacity(0.7),
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1,
+      ),
+    );
+  }
+}
+
+class _WinZone extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _WinZone({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      '$value',
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 96,
-        fontWeight: FontWeight.w900,
-        shadows: [Shadow(color: Color(0xFF7B5DEF), blurRadius: 30)],
-      ),
+      label,
+      style: TextStyle(
+          color: color.withOpacity(0.5), fontSize: 11, letterSpacing: 0.5),
     );
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  final String text;
-  const _StatusChip({required this.text});
+// ── Кнопка меню ─────────────────────────────────────────────────────────────
+
+class _TowButton extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final LinearGradient gradient;
+  final Color glowColor;
+  final VoidCallback? onTap;
+
+  const _TowButton({
+    required this.label,
+    required this.icon,
+    required this.gradient,
+    required this.glowColor,
+    required this.onTap,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2D1B4E),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Text(text,
-          style: const TextStyle(color: Colors.white70, fontSize: 16)),
-    );
-  }
+  State<_TowButton> createState() => _TowButtonState();
 }
 
-class _BigTapButton extends StatelessWidget {
-  final bool enabled, isHost;
-  const _BigTapButton({required this.enabled, required this.isHost});
+class _TowButtonState extends State<_TowButton> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final color = isHost ? Colors.redAccent : const Color(0xFF00C896);
-    return Container(
-      width: 180,
-      height: 180,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: enabled
-              ? [color.withOpacity(0.9), color.withOpacity(0.5)]
-              : [Colors.grey.shade700, Colors.grey.shade900],
-        ),
-        boxShadow: enabled
-            ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 28, spreadRadius: 4)]
-            : [],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('💪', style: TextStyle(fontSize: 48)),
-          const SizedBox(height: 6),
-          Text(
-            enabled ? 'ТЯН И!' : 'Жди...',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
-              letterSpacing: 2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RopeWidget extends StatelessWidget {
-  final double position;
-  final int maxPos;
-
-  const _RopeWidget({required this.position, required this.maxPos});
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final norm = (position + maxPos) / (2 * maxPos);
-    final markerX = norm * (width - 60) + 30;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(children: [
-        Stack(clipBehavior: Clip.none, children: [
-          Container(
-            height: 28,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              gradient: const LinearGradient(colors: [
-                Color(0xFFFF3D3D),
-                Color(0xFF1A0A2E),
-                Color(0xFF00C896),
-              ]),
-            ),
-          ),
-          Positioned(
-            left: (width - 64) / 2,
-            top: 0,
-            bottom: 0,
-            child: Container(width: 3, color: Colors.white24),
-          ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 120),
-            curve: Curves.easeOut,
-            left: markerX - 22,
-            top: -8,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-                border: Border.all(color: const Color(0xFF7B5DEF), width: 3),
-                boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 8)],
+    return GestureDetector(
+      onTapDown: widget.onTap != null ? (_) => setState(() => _pressed = true) : null,
+      onTapUp: widget.onTap != null
+          ? (_) {
+        setState(() => _pressed = false);
+        widget.onTap!();
+      }
+          : null,
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            gradient: widget.gradient,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: widget.glowColor.withOpacity(0.45),
+                blurRadius: 24,
+                spreadRadius: 2,
+                offset: const Offset(0, 6),
               ),
-              child: const Center(child: Text('🪢', style: TextStyle(fontSize: 20))),
-            ),
+            ],
           ),
-        ]),
-        const SizedBox(height: 14),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('← P1 (красные)',
-              style: TextStyle(color: Colors.redAccent.withOpacity(0.7), fontSize: 12)),
-          Text('P2 (зелёные) →',
-              style: TextStyle(color: const Color(0xFF00C896).withOpacity(0.7), fontSize: 12)),
-        ]),
-      ]),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(widget.icon, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                widget.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
-class _OnlineGameOver extends StatelessWidget {
-  final String result;
-  final VoidCallback onExit;
-  const _OnlineGameOver({required this.result, required this.onExit});
+// ── Анимированный фон ────────────────────────────────────────────────────────
+
+class _AnimatedBackground extends StatefulWidget {
+  @override
+  State<_AnimatedBackground> createState() => _AnimatedBackgroundState();
+}
+
+class _AnimatedBackgroundState extends State<_AnimatedBackground>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(seconds: 8))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final iWon = result.contains('Ты победил');
-    final isDraw = result.contains('Ничья');
-    return Container(
-      color: const Color(0xFF1A0A2E),
-      child: Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(isDraw ? '🤝' : iWon ? '🏆' : '💀',
-              style: const TextStyle(fontSize: 80)),
-          const SizedBox(height: 16),
-          Text(result,
-              style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: isDraw
-                      ? Colors.orange
-                      : iWon
-                      ? const Color(0xFFFFD700)
-                      : const Color(0xFFFF3D3D))),
-          const SizedBox(height: 40),
-          ElevatedButton(
-            onPressed: onExit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7B5DEF),
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.lerp(const Color(0xFF0F0A1E), const Color(0xFF1A0A2E),
+                    _ctrl.value)!,
+                Color.lerp(const Color(0xFF1A0A2E), const Color(0xFF0D0720),
+                    _ctrl.value)!,
+              ],
             ),
-            child: const Text('В меню',
-                style: TextStyle(fontSize: 18, color: Colors.white)),
           ),
-        ]),
-      ),
+          child: CustomPaint(painter: _BgPainter(_ctrl.value)),
+        );
+      },
     );
   }
+}
+
+class _BgPainter extends CustomPainter {
+  final double t;
+  _BgPainter(this.t);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final circles = [
+      (Offset(size.width * 0.15, size.height * 0.2), 120.0,
+      const Color(0xFF7B4DEF)),
+      (Offset(size.width * 0.85, size.height * 0.35), 90.0,
+      const Color(0xFFFF5E78)),
+      (Offset(size.width * 0.5, size.height * 0.8), 100.0,
+      const Color(0xFF00C896)),
+    ];
+
+    for (final (center, r, color) in circles) {
+      final animR = r + sin(t * pi * 2) * 15;
+      canvas.drawCircle(
+        center,
+        animR,
+        Paint()
+          ..color = color.withOpacity(0.06)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 60),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BgPainter old) => old.t != t;
 }
