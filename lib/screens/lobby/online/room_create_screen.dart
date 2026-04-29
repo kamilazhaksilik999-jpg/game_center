@@ -14,10 +14,6 @@ class RoomCreateScreen extends StatefulWidget {
 class _RoomCreateScreenState extends State<RoomCreateScreen> {
   late String roomCode;
   bool isCreated = false;
-<<<<<<< HEAD
-=======
-  bool opponentJoined = false;
->>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
 
   @override
   void initState() {
@@ -30,7 +26,6 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
       Iterable.generate(
         6,
             (_) => '0123456789'.codeUnitAt(Random().nextInt(10)),
-<<<<<<< HEAD
       ),
     );
   }
@@ -54,11 +49,11 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
     Clipboard.setData(ClipboardData(text: roomCode));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
+        content: const Row(
           children: [
-            const Icon(Icons.check_circle, color: Color(0xFF34D399), size: 20),
-            const SizedBox(width: 8),
-            const Text("Код скопирован!", style: TextStyle(color: Colors.white)),
+            Icon(Icons.check_circle, color: Color(0xFF34D399), size: 20),
+            SizedBox(width: 8),
+            Text("Код скопирован!", style: TextStyle(color: Colors.white)),
           ],
         ),
         backgroundColor: const Color(0xFF0D1B35),
@@ -68,36 +63,15 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
           side: const BorderSide(color: Color(0xFF34D399), width: 1),
         ),
         duration: const Duration(seconds: 2),
-=======
->>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
       ),
     );
-  }
-
-  Future<void> createRoom() async {
-    await FirebaseFirestore.instance
-        .collection('rooms')
-        .doc(roomCode)
-        .set({
-      'game': widget.gameName,
-      'player1': 'player1',
-      'player2': null,
-      'status': 'waiting',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    setState(() {
-      isCreated = true;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-<<<<<<< HEAD
       backgroundColor: const Color(0xFF060B1A),
 
-      // ─── AppBar видимый ────────────────────────────────────────────
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D1B35),
         elevation: 0,
@@ -110,36 +84,22 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.white24, width: 1),
             ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+            child: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: Colors.white, size: 18),
           ),
         ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.meeting_room_rounded, color: Color(0xFFD97706), size: 20),
+            const Icon(Icons.meeting_room_rounded,
+                color: Color(0xFFD97706), size: 20),
             const SizedBox(width: 8),
-=======
-      appBar: AppBar(title: Text("Комната: ${widget.gameName}")),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text("Код комнаты:", style: TextStyle(fontSize: 18)),
-            const SizedBox(height: 10),
-
->>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
             Text(
               widget.gameName,
               style: const TextStyle(
-<<<<<<< HEAD
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-=======
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 6,
->>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
               ),
             ),
           ],
@@ -151,7 +111,11 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
             height: 1,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.transparent, Color(0xFFD97706), Colors.transparent],
+                colors: [
+                  Colors.transparent,
+                  Color(0xFFD97706),
+                  Colors.transparent
+                ],
               ),
             ),
           ),
@@ -164,7 +128,6 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
           child: Column(
             children: [
 
-<<<<<<< HEAD
               const SizedBox(height: 20),
 
               // ── Блок с кодом ──────────────────────────────────────────
@@ -186,7 +149,6 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                     BoxShadow(
                       color: const Color(0xFFD97706).withValues(alpha: 0.1),
                       blurRadius: 24,
-                      spreadRadius: 0,
                     ),
                   ],
                 ),
@@ -203,7 +165,7 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Сам код — красиво отображённые цифры
+                    // Цифры кода
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: roomCode.split('').map((char) => Container(
@@ -219,7 +181,6 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: const Color(0xFF3B82F6).withValues(alpha: 0.5),
-                            width: 1,
                           ),
                           boxShadow: [
                             BoxShadow(
@@ -235,7 +196,6 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                               color: Colors.white,
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 0,
                             ),
                           ),
                         ),
@@ -248,16 +208,19 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                     GestureDetector(
                       onTap: _copyCode,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 10),
                         decoration: BoxDecoration(
                           color: const Color(0xFF1D4ED8).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.5)),
+                          border: Border.all(
+                              color: const Color(0xFF3B82F6).withValues(alpha: 0.5)),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.copy_rounded, color: Color(0xFF93C5FD), size: 16),
+                            Icon(Icons.copy_rounded,
+                                color: Color(0xFF93C5FD), size: 16),
                             SizedBox(width: 6),
                             Text(
                               "Скопировать код",
@@ -297,11 +260,13 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
                         return const Center(
-                          child: CircularProgressIndicator(color: Color(0xFF06B6D4)),
+                          child: CircularProgressIndicator(
+                              color: Color(0xFF06B6D4)),
                         );
                       }
 
-                      final data = snapshot.data!.data() as Map<String, dynamic>?;
+                      final data =
+                      snapshot.data!.data() as Map<String, dynamic>?;
                       final player2 = data?['player2'];
 
                       if (player2 != null) {
@@ -324,7 +289,8 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Container(
-          width: 80, height: 80,
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: const LinearGradient(
@@ -372,9 +338,9 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Анимированный контейнер ожидания
         Container(
-          width: 80, height: 80,
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: LinearGradient(
@@ -412,22 +378,24 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
         ),
         const SizedBox(height: 32),
 
-        // Пульсирующий индикатор
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(3, (i) => Container(
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            width: 8, height: 8,
-            decoration: const BoxDecoration(
-              color: Color(0xFF06B6D4),
-              shape: BoxShape.circle,
+          children: List.generate(
+            3,
+                (i) => Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Color(0xFF06B6D4),
+                shape: BoxShape.circle,
+              ),
             ),
-          )),
+          ),
         ),
 
         const SizedBox(height: 32),
 
-        // Кнопка отмена
         GestureDetector(
           onTap: () async {
             await FirebaseFirestore.instance
@@ -505,91 +473,6 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                 letterSpacing: 0.5,
               ),
             ),
-=======
-            if (!isCreated)
-              ElevatedButton(
-                onPressed: createRoom,
-                child: const Text("Создать комнату"),
-              ),
-
-            if (isCreated) ...[
-              const SizedBox(height: 20),
-
-              // Слушаем Firestore — ждём пока player2 войдёт
-              StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('rooms')
-                    .doc(roomCode)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const CircularProgressIndicator();
-                  }
-
-                  final data =
-                  snapshot.data!.data() as Map<String, dynamic>?;
-
-                  final player2 = data?['player2'];
-
-                  if (player2 != null) {
-                    // Игрок зашёл — можно начинать
-                    return Column(
-                      children: [
-                        const Icon(Icons.check_circle,
-                            color: Colors.green, size: 48),
-                        const SizedBox(height: 10),
-                        const Text(
-                          "Противник подключился!",
-                          style: TextStyle(
-                              fontSize: 18, color: Colors.green),
-                        ),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            // TODO: переход к игре
-                          },
-                          child: const Text("Начать игру"),
-                        ),
-                      ],
-                    );
-                  }
-
-                  // Ожидание с таймером
-                  return Column(
-                    children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 16),
-                      const Text(
-                        "Ожидание противника...",
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        "Поделитесь кодом с другом",
-                        style:
-                        TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 20),
-                      TextButton(
-                        onPressed: () async {
-                          // Удаляем комнату если отменили
-                          await FirebaseFirestore.instance
-                              .collection('rooms')
-                              .doc(roomCode)
-                              .delete();
-                          if (context.mounted) Navigator.pop(context);
-                        },
-                        child: const Text(
-                          "Отменить",
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
->>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
           ],
         ),
       ),

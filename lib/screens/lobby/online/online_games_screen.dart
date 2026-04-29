@@ -49,19 +49,14 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
           case 'random':
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const RandomMatchmakingScreen()),
+              MaterialPageRoute(builder: (_) => const RandomMatchmakingScreen()),
             );
             break;
 
           case 'room':
             Navigator.pushReplacement(
               context,
-<<<<<<< HEAD
-              MaterialPageRoute(builder: (_) => const TugOfWarRoomScreen()),
-=======
               MaterialPageRoute(builder: (_) => const TankRoomScreen()),
->>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
             );
             break;
         }
@@ -81,8 +76,7 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
           case 'room':
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const BattleshipRoomScreen()),
+              MaterialPageRoute(builder: (_) => const BattleshipRoomScreen()),
             );
             break;
         }
@@ -102,8 +96,7 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
           case 'room':
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const TugOfWarRoomScreen()),
+              MaterialPageRoute(builder: (_) => const TugOfWarRoomScreen()),
             );
             break;
         }
@@ -117,8 +110,7 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
           case 'room':
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const FootballGameScreen()),
+              MaterialPageRoute(builder: (_) => const FootballGameScreen()),
             );
             break;
         }
@@ -135,8 +127,7 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text(
           '🚧 Скоро!',
           style: TextStyle(color: Colors.white, fontSize: 22),
@@ -166,8 +157,7 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
     return const Scaffold(
       backgroundColor: Color(0xFF0F172A),
       body: Center(
-        child:
-        CircularProgressIndicator(color: Colors.tealAccent),
+        child: CircularProgressIndicator(color: Colors.tealAccent),
       ),
     );
   }
@@ -179,8 +169,7 @@ class RandomMatchmakingScreen extends StatefulWidget {
   const RandomMatchmakingScreen({super.key});
 
   @override
-  State<RandomMatchmakingScreen> createState() =>
-      _RandomMatchmakingScreenState();
+  State<RandomMatchmakingScreen> createState() => _RandomMatchmakingScreenState();
 }
 
 class _RandomMatchmakingScreenState extends State<RandomMatchmakingScreen>
@@ -198,10 +187,9 @@ class _RandomMatchmakingScreenState extends State<RandomMatchmakingScreen>
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
 
-    _dotsSub =
-        Stream.periodic(const Duration(milliseconds: 500)).listen((_) {
-          if (mounted) setState(() => _dots = (_dots + 1) % 4);
-        });
+    _dotsSub = Stream.periodic(const Duration(milliseconds: 500)).listen((_) {
+      if (mounted) setState(() => _dots = (_dots + 1) % 4);
+    });
 
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
@@ -247,14 +235,12 @@ class _RandomMatchmakingScreenState extends State<RandomMatchmakingScreen>
                     shape: BoxShape.circle,
                     color: Colors.green.withOpacity(0.15),
                     border: Border.all(
-                      color: Colors.green
-                          .withOpacity(0.4 + _pulse.value * 0.4),
+                      color: Colors.green.withOpacity(0.4 + _pulse.value * 0.4),
                       width: 3,
                     ),
                   ),
                   child: const Center(
-                    child: Text('🎲',
-                        style: TextStyle(fontSize: 56)),
+                    child: Text('🎲', style: TextStyle(fontSize: 56)),
                   ),
                 ),
               ),
