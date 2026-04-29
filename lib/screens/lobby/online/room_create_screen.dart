@@ -49,11 +49,11 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
     Clipboard.setData(ClipboardData(text: roomCode));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Row(
+        content: Row(
           children: [
-            Icon(Icons.check_circle, color: Color(0xFF34D399), size: 20),
-            SizedBox(width: 8),
-            Text("Код скопирован!", style: TextStyle(color: Colors.white)),
+            const Icon(Icons.check_circle, color: Color(0xFF34D399), size: 20),
+            const SizedBox(width: 8),
+            const Text("Код скопирован!", style: TextStyle(color: Colors.white)),
           ],
         ),
         backgroundColor: const Color(0xFF0D1B35),
@@ -71,7 +71,6 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF060B1A),
-
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D1B35),
         elevation: 0,
@@ -121,19 +120,18 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
           ),
         ),
       ),
-
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-
               const SizedBox(height: 20),
 
               // ── Блок с кодом ──────────────────────────────────────────
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+                padding:
+                const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF0D1B35), Color(0xFF111827)],
@@ -149,6 +147,7 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                     BoxShadow(
                       color: const Color(0xFFD97706).withValues(alpha: 0.1),
                       blurRadius: 24,
+                      spreadRadius: 0,
                     ),
                   ],
                 ),
@@ -165,26 +164,35 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Цифры кода
+                    // Сам код — красиво отображённые цифры
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: roomCode.split('').map((char) => Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                      children: roomCode
+                          .split('')
+                          .map((char) => Container(
+                        margin:
+                        const EdgeInsets.symmetric(horizontal: 4),
                         width: 42,
                         height: 54,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF1E3A8A), Color(0xFF1D4ED8)],
+                            colors: [
+                              Color(0xFF1E3A8A),
+                              Color(0xFF1D4ED8)
+                            ],
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                           ),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: const Color(0xFF3B82F6).withValues(alpha: 0.5),
+                            color: const Color(0xFF3B82F6)
+                                .withValues(alpha: 0.5),
+                            width: 1,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
+                              color: const Color(0xFF3B82F6)
+                                  .withValues(alpha: 0.2),
                               blurRadius: 8,
                             ),
                           ],
@@ -196,10 +204,12 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                               color: Colors.white,
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
+                              letterSpacing: 0,
                             ),
                           ),
                         ),
-                      )).toList(),
+                      ))
+                          .toList(),
                     ),
 
                     const SizedBox(height: 20),
@@ -214,7 +224,8 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                           color: const Color(0xFF1D4ED8).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                              color: const Color(0xFF3B82F6).withValues(alpha: 0.5)),
+                              color: const Color(0xFF3B82F6)
+                                  .withValues(alpha: 0.5)),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
@@ -303,7 +314,8 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
               ),
             ],
           ),
-          child: const Icon(Icons.check_rounded, color: Colors.white, size: 44),
+          child:
+          const Icon(Icons.check_rounded, color: Colors.white, size: 44),
         ),
         const SizedBox(height: 16),
         const Text(
@@ -378,24 +390,25 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
         ),
         const SizedBox(height: 32),
 
+        // Пульсирующий индикатор
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(
-            3,
-                (i) => Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: Color(0xFF06B6D4),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
+              3,
+                  (i) => Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF06B6D4),
+                  shape: BoxShape.circle,
+                ),
+              )),
         ),
 
         const SizedBox(height: 32),
 
+        // Кнопка отмена
         GestureDetector(
           onTap: () async {
             await FirebaseFirestore.instance
@@ -405,7 +418,8 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
             if (context.mounted) Navigator.pop(context);
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFFF43F5E).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
