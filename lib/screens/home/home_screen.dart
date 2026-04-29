@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:game_center/screens/lobby/lobby_screen.dart';
 import '../../data/levels.dart';
 import '../../features/leaderboard/leaderboard_provider.dart';
-import '../../features/leaderboard/leaderboard_screen.dart'; // ✅ импорт
+import '../../features/leaderboard/leaderboard_screen.dart';
 import '../../core/services/coin_service.dart';
 import '../../core/services/user_service.dart';
 
@@ -38,13 +38,59 @@ class _HomeScreenState extends State<HomeScreen> {
     UserService.getOrCreateUser();
   }
 
+  // Данные игровых карточек
+  final List<_GameData> _games = [
+    _GameData(
+      title: "Память",
+      subtitle: "Найди пары",
+      asset: "assets/memory.png",
+      gradient: [Color(0xFF6D28D9), Color(0xFFDB2777)],
+      glow: Color(0xFFDB2777),
+    ),
+    _GameData(
+      title: "Математика",
+      subtitle: "Реши задачи",
+      asset: "assets/math.png",
+      gradient: [Color(0xFF1D4ED8), Color(0xFF06B6D4)],
+      glow: Color(0xFF06B6D4),
+    ),
+    _GameData(
+      title: "Кликер",
+      subtitle: "Кликай быстро",
+      asset: "assets/clicker.png",
+      gradient: [Color(0xFFD97706), Color(0xFFF43F5E)],
+      glow: Color(0xFFF43F5E),
+    ),
+    _GameData(
+      title: "Крестики",
+      subtitle: "Три в ряд",
+      asset: "assets/tic.png",
+      gradient: [Color(0xFF059669), Color(0xFF34D399)],
+      glow: Color(0xFF34D399),
+    ),
+    _GameData(
+      title: "Судоку",
+      subtitle: "Заполни поле",
+      asset: "assets/sudoku.png",
+      gradient: [Color(0xFF0F766E), Color(0xFF818CF8)],
+      glow: Color(0xFF818CF8),
+    ),
+    _GameData(
+      title: "Найди отличия",
+      subtitle: "Сравни картинки",
+      asset: "assets/diff.png",
+      gradient: [Color(0xFF334155), Color(0xFF64748B)],
+      glow: Color(0xFF94A3B8),
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+            colors: [Color(0xFF060B1A), Color(0xFF0D1B35)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -53,152 +99,204 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
 
-              /// 🔝 HEADER
+              // ─── HEADER ───────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
 
-                    // Название
-                    const Text(
-                      "🎮 GameZone",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    // Лого
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "GAME",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 4,
+                            height: 1,
+                          ),
+                        ),
+                        ShaderMask(
+                          shaderCallback: (b) => const LinearGradient(
+                            colors: [Color(0xFF06B6D4), Color(0xFF818CF8)],
+                          ).createShader(b),
+                          child: const Text(
+                            "ZONE",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 4,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
 
-                    // Все кнопки справа
+                    // Иконки справа
                     Row(
                       children: [
-
-                        // 🏆 РЕЙТИНГ — ведёт на LeaderboardScreen
-                        _topButton(
-                          Icons.emoji_events,
-                          Colors.amber,
-                              () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => LeaderboardScreen(),
-                            ),
-                          ),
+                        _headerIcon(
+                          icon: Icons.emoji_events_rounded,
+                          gradient: [Color(0xFFD97706), Color(0xFFFBBF24)],
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => LeaderboardScreen())),
                         ),
-
                         const SizedBox(width: 8),
-
-                        // 🎰 КОЛЕСО УДАЧИ — отдельная кнопка с градиентом
-                        GestureDetector(
+                        _headerIcon(
+                          icon: Icons.rotate_right_rounded,
+                          gradient: [Color(0xFF7C3AED), Color(0xFFDB2777)],
                           onTap: () => Navigator.pushNamed(context, "/spin"),
-                          child: Container(
-                            width: 45,
-                            height: 45,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF7C3AED), Color(0xFFDB2777)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.purple.withValues(alpha: 0.5),
-                                  blurRadius: 8,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.rotate_right,
-                              color: Colors.white,
-                              size: 26,
-                            ),
-                          ),
                         ),
-
                         const SizedBox(width: 8),
-
-                        // 🛒 МАГАЗИН
-                        _topButton(Icons.store, Colors.orange, () {
-                          Navigator.pushNamed(context, "/shop");
-                        }),
-
+                        _headerIcon(
+                          icon: Icons.store_rounded,
+                          gradient: [Color(0xFFD97706), Color(0xFFF97316)],
+                          onTap: () => Navigator.pushNamed(context, "/shop"),
+                        ),
                         const SizedBox(width: 8),
-
-                        // 📡 ЛОББИ
-                        _topButton(Icons.wifi, Colors.green, () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => LobbyScreen()),
-                          );
-                        }),
-
+                        _headerIcon(
+                          icon: Icons.wifi_rounded,
+                          gradient: [Color(0xFF059669), Color(0xFF34D399)],
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const LobbyScreen())),
+                        ),
                         const SizedBox(width: 8),
-
-                        // 👤 ПРОФИЛЬ
-                        _topButton(Icons.person, Colors.pink, () async {
-                          await Navigator.pushNamed(context, "/profile");
-                          setState(() {});
-                        }),
+                        _headerIcon(
+                          icon: Icons.person_rounded,
+                          gradient: [Color(0xFFDB2777), Color(0xFFF9A8D4)],
+                          onTap: () async {
+                            await Navigator.pushNamed(context, "/profile");
+                            setState(() {});
+                          },
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              /// 🪙 МОНЕТЫ
+              // ─── МОНЕТЫ ───────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E3A8A),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.monetization_on, color: Colors.yellow),
-                      const SizedBox(width: 8),
-                      Text(
-                        "${CoinService.getCoins()} монет",
-                        style: const TextStyle(color: Colors.white),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1E3A8A), Color(0xFF1D4ED8)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF3B82F6), width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        spreadRadius: 0,
                       ),
                     ],
                   ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              /// 🎮 СЕТКА ИГР
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: GridView.count(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.85,
+                  child: Row(
                     children: [
-                      _gameCard("Память", "assets/memory.png", Colors.purple,
-                              () => openGame(const MemoryScreen())),
-                      _gameCard("Математика", "assets/math.png", Colors.blue,
-                              () => openGame(const MathScreen())),
-                      _gameCard("Кликер", "assets/clicker.png", Colors.orange,
-                              () => openGame(const ClickerScreen())),
-                      _gameCard("Крестики", "assets/tic.png", Colors.green,
-                              () => openGame(const TicTacToeScreen())),
-                      _gameCard("Судоку", "assets/sudoku.png", Colors.teal,
-                              () => openGame(const SudokuScreen())),
-                      _gameCard("Найди", "assets/diff.png", Colors.blueGrey,
-                              () => openGame(FindDiffScreen(level: levels[0]))),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFBBF24),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFBBF24).withValues(alpha: 0.5),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.monetization_on, color: Color(0xFF92400E), size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        "${CoinService.getCoins()} монет",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.add_circle_outline, color: Color(0xFF93C5FD), size: 20),
                     ],
                   ),
                 ),
               ),
+
+              const SizedBox(height: 16),
+
+              // ─── ЗАГОЛОВОК СЕКЦИИ ──────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF06B6D4), Color(0xFF818CF8)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "ОДИНОЧНЫЕ ИГРЫ",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // ─── СПИСОК ИГР ────────────────────────────────────────────
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _games.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, i) {
+                    final g = _games[i];
+                    return _buildGameCard(
+                      data: g,
+                      onTap: () {
+                        switch (i) {
+                          case 0: openGame(const MemoryScreen()); break;
+                          case 1: openGame(const MathScreen()); break;
+                          case 2: openGame(const ClickerScreen()); break;
+                          case 3: openGame(const TicTacToeScreen()); break;
+                          case 4: openGame(const SudokuScreen()); break;
+                          case 5: openGame(FindDiffScreen(level: levels[0])); break;
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -206,51 +304,158 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _topButton(IconData icon, Color color, VoidCallback onTap) {
+  // ── Карточка игры (горизонтальная, во всю ширину) ─────────────────────────
+  Widget _buildGameCard({required _GameData data, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 45,
-        height: 45,
+        height: 80,
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: Colors.white),
-      ),
-    );
-  }
-
-  Widget _gameCard(String title, String image, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: color, width: 1.5),
+          gradient: LinearGradient(
+            colors: [
+              data.gradient[0].withValues(alpha: 0.25),
+              data.gradient[1].withValues(alpha: 0.1),
+            ],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          border: Border.all(
+            color: data.gradient[1].withValues(alpha: 0.5),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: data.glow.withValues(alpha: 0.15),
+              blurRadius: 12,
+              spreadRadius: 0,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Row(
           children: [
+
+            // Иконка/Изображение
             Container(
-              width: 60,
-              height: 60,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(17),
+                  bottomLeft: Radius.circular(17),
+                ),
+                gradient: LinearGradient(
+                  colors: data.gradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Image.asset(image, fit: BoxFit.contain),
+                padding: const EdgeInsets.all(14),
+                child: Image.asset(data.asset, fit: BoxFit.contain),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(title,
-                style: const TextStyle(color: Colors.white, fontSize: 12)),
+
+            const SizedBox(width: 16),
+
+            // Текст
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    data.subtitle,
+                    style: TextStyle(
+                      color: data.gradient[1].withValues(alpha: 0.85),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Стрелка
+            Container(
+              margin: const EdgeInsets.only(right: 16),
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: data.gradient),
+                boxShadow: [
+                  BoxShadow(
+                    color: data.glow.withValues(alpha: 0.4),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+            ),
           ],
         ),
       ),
     );
   }
+
+  // ── Кнопка в хедере ───────────────────────────────────────────────────────
+  Widget _headerIcon({
+    required IconData icon,
+    required List<Color> gradient,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: gradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(11),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.last.withValues(alpha: 0.4),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+    );
+  }
+}
+
+// ── Модель данных карточки ─────────────────────────────────────────────────
+class _GameData {
+  final String title;
+  final String subtitle;
+  final String asset;
+  final List<Color> gradient;
+  final Color glow;
+
+  const _GameData({
+    required this.title,
+    required this.subtitle,
+    required this.asset,
+    required this.gradient,
+    required this.glow,
+  });
 }

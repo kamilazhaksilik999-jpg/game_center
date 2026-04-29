@@ -23,14 +23,14 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
   int _currentCoins = 0;
 
   final List<_Segment> _segments = [
-    _Segment('10',   10,  Color(0xFFFF6B6B), '🪙'),
-    _Segment('50',   50,  Color(0xFFFFB347), '💰'),
-    _Segment('5',    5,   Color(0xFF4ECDC4), '🪙'),
-    _Segment('100',  100, Color(0xFF45B7D1), '💎'),
-    _Segment('25',   25,  Color(0xFF96CEB4), '🪙'),
-    _Segment('500',  500, Color(0xFFDDA0DD), '👑'),
-    _Segment('15',   15,  Color(0xFFFF9FF3), '🪙'),
-    _Segment('200',  200, Color(0xFF54A0FF), '💰'),
+    _Segment('10',   10,  Color(0xFFEF4444), '🪙'),
+    _Segment('50',   50,  Color(0xFFF97316), '💰'),
+    _Segment('5',    5,   Color(0xFF06B6D4), '🪙'),
+    _Segment('100',  100, Color(0xFF3B82F6), '💎'),
+    _Segment('25',   25,  Color(0xFF34D399), '🪙'),
+    _Segment('500',  500, Color(0xFFA855F7), '👑'),
+    _Segment('15',   15,  Color(0xFFF43F5E), '🪙'),
+    _Segment('200',  200, Color(0xFF818CF8), '💰'),
   ];
 
   final List<int> _weights = [30, 20, 35, 5, 25, 1, 28, 8];
@@ -54,7 +54,6 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     final today = _today();
     _userId = prefs.getString('user_id');
 
-    // Загружаем монеты из Firebase
     if (_userId != null) {
       try {
         final doc = await FirebaseFirestore.instance
@@ -62,9 +61,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
             .doc(_userId)
             .get();
         if (doc.exists) {
-          setState(() {
-            _currentCoins = doc.data()?['coins'] ?? 0;
-          });
+          setState(() => _currentCoins = doc.data()?['coins'] ?? 0);
         }
       } catch (_) {}
     }
@@ -94,57 +91,40 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     int winIndex = 0;
     for (int i = 0; i < _weights.length; i++) {
       roll -= _weights[i];
-      if (roll < 0) {
-        winIndex = i;
-        break;
-      }
+      if (roll < 0) { winIndex = i; break; }
     }
 
     final segAngle = (2 * pi) / _segments.length;
-    // Стрелка сверху — вычисляем куда нужно повернуть
     final targetAngle = 2 * pi - (segAngle * winIndex + segAngle / 2);
     final spins = 5 + random.nextInt(3);
     final endAngle = _currentAngle + spins * 2 * pi + targetAngle - (_currentAngle % (2 * pi));
 
     _controller.duration = const Duration(milliseconds: 4500);
-    _rotationAnim = Tween<double>(
-      begin: _currentAngle,
-      end: endAngle,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
+    _rotationAnim = Tween<double>(begin: _currentAngle, end: endAngle).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
 
     _controller.forward(from: 0).then((_) async {
       _currentAngle = endAngle % (2 * pi);
       final won = _segments[winIndex].coins;
 
-      // ✅ Сохраняем дату — больше нельзя крутить сегодня
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('last_spin_date', _today());
 
-      // ✅ Начисляем монеты в Firebase
       if (_userId != null) {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(_userId)
             .update({'coins': FieldValue.increment(won)});
 
-        // Обновляем локально
         final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(_userId)
             .get();
-        setState(() {
-          _currentCoins = doc.data()?['coins'] ?? 0;
-        });
+        setState(() => _currentCoins = doc.data()?['coins'] ?? 0);
       }
 
-      setState(() {
-        _isSpinning = false;
-        _canSpin = false;
-      });
-
+      setState(() { _isSpinning = false; _canSpin = false; });
       if (mounted) _showResult(won, _segments[winIndex]);
     });
   }
@@ -153,18 +133,26 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (_) => Dialog(
         backgroundColor: Colors.transparent,
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: const Color(0xFF16213E),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: segment.color, width: 2),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0D1B35), Color(0xFF060B1A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: segment.color.withValues(alpha: 0.6),
+              width: 2,
+            ),
             boxShadow: [
               BoxShadow(
-                color: segment.color.withValues(alpha: 0.4),
-                blurRadius: 30,
+                color: segment.color.withValues(alpha: 0.35),
+                blurRadius: 40,
                 spreadRadius: 5,
               ),
             ],
@@ -172,62 +160,111 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(segment.emoji,
-                  style: const TextStyle(fontSize: 60)),
-              const SizedBox(height: 12),
-              const Text('🎉 Поздравляем!',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Ты выиграл',
-                  style: TextStyle(color: Colors.white54)),
-              const SizedBox(height: 12),
+              // Эмодзи с свечением
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 12),
+                width: 80, height: 80,
                 decoration: BoxDecoration(
-                  color: segment.color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: segment.color),
+                  shape: BoxShape.circle,
+                  color: segment.color.withValues(alpha: 0.15),
+                  border: Border.all(color: segment.color.withValues(alpha: 0.4)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: segment.color.withValues(alpha: 0.3),
+                      blurRadius: 20,
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(segment.emoji, style: const TextStyle(fontSize: 36)),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              const Text(
+                '🎉 Поздравляем!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Ты выиграл',
+                style: TextStyle(color: Colors.white38, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+
+              // Сумма выигрыша
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      segment.color.withValues(alpha: 0.25),
+                      segment.color.withValues(alpha: 0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: segment.color.withValues(alpha: 0.6)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: segment.color.withValues(alpha: 0.2),
+                      blurRadius: 16,
+                    ),
+                  ],
                 ),
                 child: Text(
                   '$coins 🪙',
                   style: TextStyle(
-                      color: segment.color,
-                      fontSize: 40,
-                      fontWeight: FontWeight.bold),
+                    color: segment.color,
+                    fontSize: 42,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1,
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
+
               Text(
-                'Монет на счету: $_currentCoins 🪙',
-                style: const TextStyle(
-                    color: Colors.white54, fontSize: 13),
+                'На счету: $_currentCoins 🪙',
+                style: const TextStyle(color: Colors.white54, fontSize: 13),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
                 'Следующий спин через ${_timeLeft()}',
-                style:
-                const TextStyle(color: Colors.white38, fontSize: 12),
+                style: const TextStyle(color: Colors.white24, fontSize: 11),
               ),
               const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: segment.color,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+
+              // Кнопка
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [segment.color, segment.color.withValues(alpha: 0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: segment.color.withValues(alpha: 0.4),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Забрать! 🎉',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white)),
+                  child: const Text(
+                    'Забрать! 🎉',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -240,58 +277,138 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1628),
+      backgroundColor: const Color(0xFF060B1A),
+
+      // ── AppBar ──────────────────────────────────────────────────────
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF0D1B35),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white24, width: 1),
+            ),
+            child: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+          ),
         ),
-        title: const Text('🎰 Колесо удачи',
+
+        title: ShaderMask(
+          shaderCallback: (b) => const LinearGradient(
+            colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
+          ).createShader(b),
+          child: const Text(
+            '🎰 Колесо удачи',
             style: TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold)),
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 19,
+            ),
+          ),
+        ),
         centerTitle: true,
+
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: Text('$_currentCoins 🪙',
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1E3A8A), Color(0xFF1D4ED8)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 14, height: 14,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFBBF24),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '$_currentCoins',
                   style: const TextStyle(
-                      color: Colors.amber,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15)),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
+
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            height: 1,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.transparent, Color(0xFFFBBF24), Colors.transparent],
+              ),
+            ),
+          ),
+        ),
       ),
+
       body: Column(
         children: [
-          const SizedBox(height: 12),
 
-          // ── Статус ──────────────────────────
+          const SizedBox(height: 14),
+
+          // ── Статус доступности ──────────────────────────────────────
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding:
-            const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
             decoration: BoxDecoration(
-              color: _canSpin
-                  ? Colors.green.withValues(alpha: 0.15)
-                  : Colors.red.withValues(alpha: 0.15),
+              gradient: LinearGradient(
+                colors: _canSpin
+                    ? [
+                  const Color(0xFF059669).withValues(alpha: 0.2),
+                  const Color(0xFF065F46).withValues(alpha: 0.1),
+                ]
+                    : [
+                  const Color(0xFF7F1D1D).withValues(alpha: 0.2),
+                  const Color(0xFF450A0A).withValues(alpha: 0.1),
+                ],
+              ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color:
-                _canSpin ? Colors.greenAccent : Colors.redAccent,
+                color: _canSpin
+                    ? const Color(0xFF34D399).withValues(alpha: 0.5)
+                    : const Color(0xFFF43F5E).withValues(alpha: 0.4),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: (_canSpin
+                      ? const Color(0xFF34D399)
+                      : const Color(0xFFF43F5E))
+                      .withValues(alpha: 0.1),
+                  blurRadius: 12,
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  _canSpin ? Icons.check_circle : Icons.timer,
-                  color:
-                  _canSpin ? Colors.greenAccent : Colors.redAccent,
+                  _canSpin ? Icons.check_circle_rounded : Icons.timer_rounded,
+                  color: _canSpin
+                      ? const Color(0xFF34D399)
+                      : const Color(0xFFF43F5E),
                   size: 18,
                 ),
                 const SizedBox(width: 8),
@@ -301,8 +418,8 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
                       : 'Следующий спин через ${_timeLeft()}',
                   style: TextStyle(
                     color: _canSpin
-                        ? Colors.greenAccent
-                        : Colors.redAccent,
+                        ? const Color(0xFF34D399)
+                        : const Color(0xFFF43F5E),
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -311,47 +428,91 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // ── Стрелка ──────────────────────────
-          const Icon(Icons.arrow_drop_down,
-              color: Colors.orange, size: 48),
+          // ── Стрелка-указатель ───────────────────────────────────────
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF97316), Color(0xFFFBBF24)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFF97316).withValues(alpha: 0.5),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.arrow_drop_down_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
 
-          // ── КОЛЕСО через Transform.rotate ───
+          const SizedBox(height: 4),
+
+          // ── КОЛЕСО ──────────────────────────────────────────────────
           Expanded(
             child: Center(
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Свечение
+
+                  // Внешнее свечение
                   Container(
-                    width: 310,
-                    height: 310,
+                    width: 322,
+                    height: 322,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color:
-                          Colors.orange.withValues(alpha: 0.25),
-                          blurRadius: 40,
+                          color: const Color(0xFFF97316).withValues(alpha: 0.2),
+                          blurRadius: 50,
                           spreadRadius: 10,
+                        ),
+                        BoxShadow(
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                          blurRadius: 30,
+                          spreadRadius: 5,
                         ),
                       ],
                     ),
                   ),
 
-                  // Золотое кольцо
+                  // Внешнее кольцо (градиент)
                   Container(
-                    width: 308,
-                    height: 308,
+                    width: 316,
+                    height: 316,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(
-                          color: Colors.amber, width: 5),
+                      gradient: const SweepGradient(
+                        colors: [
+                          Color(0xFFFBBF24),
+                          Color(0xFFF97316),
+                          Color(0xFFEF4444),
+                          Color(0xFFA855F7),
+                          Color(0xFF3B82F6),
+                          Color(0xFF06B6D4),
+                          Color(0xFF34D399),
+                          Color(0xFFFBBF24),
+                        ],
+                      ),
+                    ),
+                    child: Container(
+                      margin: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF060B1A),
+                      ),
                     ),
                   ),
 
-                  // Колесо — сегменты через AnimatedBuilder
+                  // Само колесо
                   AnimatedBuilder(
                     animation: _controller,
                     builder: (_, __) {
@@ -361,56 +522,64 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
                       return Transform.rotate(
                         angle: angle,
                         child: SizedBox(
-                          width: 295,
-                          height: 295,
+                          width: 298,
+                          height: 298,
                           child: _buildWheelWidget(),
                         ),
                       );
                     },
                   ),
 
-                  // Центральная кнопка
+                  // Центральная кнопка SPIN
                   GestureDetector(
                     onTap: _canSpin && !_isSpinning ? _spin : null,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      width: 72,
-                      height: 72,
+                      width: 76,
+                      height: 76,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _canSpin
-                            ? Colors.orange
-                            : const Color(0xFF334155),
+                        gradient: _canSpin
+                            ? const LinearGradient(
+                          colors: [Color(0xFFD97706), Color(0xFFF97316)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                            : const LinearGradient(
+                          colors: [Color(0xFF1E293B), Color(0xFF334155)],
+                        ),
                         boxShadow: _canSpin
                             ? [
                           BoxShadow(
-                            color: Colors.orange
-                                .withValues(alpha: 0.6),
-                            blurRadius: 16,
-                            spreadRadius: 2,
-                          )
+                            color: const Color(0xFFF97316).withValues(alpha: 0.55),
+                            blurRadius: 20,
+                            spreadRadius: 3,
+                          ),
                         ]
                             : [],
                         border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            width: 2),
+                          color: Colors.white.withValues(alpha: 0.2),
+                          width: 2,
+                        ),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
                             _isSpinning
-                                ? Icons.autorenew
-                                : Icons.rotate_right,
+                                ? Icons.autorenew_rounded
+                                : Icons.rotate_right_rounded,
                             color: Colors.white,
-                            size: 22,
+                            size: 24,
                           ),
                           Text(
                             _isSpinning ? '...' : 'SPIN',
                             style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11),
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                              letterSpacing: 1,
+                            ),
                           ),
                         ],
                       ),
@@ -421,64 +590,101 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
             ),
           ),
 
-          // ── Призы ────────────────────────────
+          // ── Призы-пилюли ────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
               alignment: WrapAlignment.center,
-              children: _segments
-                  .map((s) => Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
+              children: _segments.map((s) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: s.color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: s.color.withValues(alpha: 0.5)),
+                  gradient: LinearGradient(
+                    colors: [
+                      s.color.withValues(alpha: 0.2),
+                      s.color.withValues(alpha: 0.08),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: s.color.withValues(alpha: 0.5)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: s.color.withValues(alpha: 0.1),
+                      blurRadius: 6,
+                    ),
+                  ],
                 ),
-                child: Text('${s.coins} 🪙',
-                    style: TextStyle(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(s.emoji, style: const TextStyle(fontSize: 12)),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${s.coins}',
+                      style: TextStyle(
                         color: s.color,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12)),
-              ))
-                  .toList(),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              )).toList(),
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // ── Кнопка ───────────────────────────
+          // ── Кнопка КРУТИТЬ ───────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed:
-                _canSpin && !_isSpinning ? _spin : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  disabledBackgroundColor:
-                  Colors.grey.withValues(alpha: 0.2),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  elevation: _canSpin ? 8 : 0,
-                  shadowColor:
-                  Colors.orange.withValues(alpha: 0.5),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: GestureDetector(
+              onTap: _canSpin && !_isSpinning ? _spin : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: double.infinity,
+                height: 58,
+                decoration: BoxDecoration(
+                  gradient: _canSpin
+                      ? const LinearGradient(
+                    colors: [Color(0xFFD97706), Color(0xFFF97316)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  )
+                      : const LinearGradient(
+                    colors: [Color(0xFF1E293B), Color(0xFF334155)],
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: _canSpin
+                      ? [
+                    BoxShadow(
+                      color: const Color(0xFFF97316).withValues(alpha: 0.4),
+                      blurRadius: 18,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                      : [],
                 ),
-                child: Text(
-                  _isSpinning
-                      ? '🎰  Крутится...'
-                      : _canSpin
-                      ? '🎰  КРУТИТЬ!'
-                      : '⏳  Завтра можно снова',
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("🎰", style: TextStyle(fontSize: 20)),
+                    const SizedBox(width: 10),
+                    Text(
+                      _isSpinning
+                          ? 'Крутится...'
+                          : _canSpin
+                          ? 'КРУТИТЬ!'
+                          : '⏳  Завтра можно снова',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: _canSpin ? Colors.white : Colors.white30,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -490,7 +696,6 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     );
   }
 
-  // ── Колесо через Stack + Transform ──────────
   Widget _buildWheelWidget() {
     final segCount = _segments.length;
     final segAngle = 360 / segCount;
@@ -498,30 +703,32 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Круг-фон
         Container(
-          width: 295,
-          height: 295,
+          width: 298, height: 298,
           decoration: const BoxDecoration(shape: BoxShape.circle),
         ),
-
-        // Сегменты через ClipPath
         ...List.generate(segCount, (i) {
           return Transform.rotate(
             angle: (segAngle * i) * pi / 180,
             child: ClipPath(
               clipper: _SegmentClipper(segAngle),
               child: Container(
-                width: 295,
-                height: 295,
+                width: 298, height: 298,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _segments[i].color,
+                  gradient: RadialGradient(
+                    colors: [
+                      _segments[i].color.withValues(alpha: 0.9),
+                      _segments[i].color.withValues(alpha: 0.6),
+                    ],
+                    center: Alignment.center,
+                    radius: 0.9,
+                  ),
                 ),
                 child: Align(
                   alignment: const Alignment(0.2, -1),
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 28),
+                    padding: const EdgeInsets.only(top: 24),
                     child: Transform.rotate(
                       angle: (segAngle / 2) * pi / 180,
                       child: Column(
@@ -534,11 +741,9 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w900,
                               shadows: [
-                                Shadow(
-                                    color: Colors.black54,
-                                    blurRadius: 4)
+                                Shadow(color: Colors.black54, blurRadius: 4),
                               ],
                             ),
                           ),
@@ -551,16 +756,23 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
             ),
           );
         }),
-
-        // Белые разделительные линии
+        // Разделительные линии
         ...List.generate(segCount, (i) {
           return Transform.rotate(
             angle: (segAngle * i) * pi / 180,
             child: Container(
-              width: 2,
-              height: 147,
-              margin: const EdgeInsets.only(bottom: 147),
-              color: Colors.white.withValues(alpha: 0.4),
+              width: 1.5, height: 149,
+              margin: const EdgeInsets.only(bottom: 149),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.6),
+                    Colors.white.withValues(alpha: 0.1),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
             ),
           );
         }),
@@ -569,7 +781,6 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
   }
 }
 
-// ── Clipper для сегмента ─────────────────────
 class _SegmentClipper extends CustomClipper<Path> {
   final double angleDeg;
   _SegmentClipper(this.angleDeg);
@@ -594,7 +805,6 @@ class _SegmentClipper extends CustomClipper<Path> {
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
-// ── Модель ───────────────────────────────────
 class _Segment {
   final String label;
   final int coins;
@@ -602,4 +812,3 @@ class _Segment {
   final String emoji;
   const _Segment(this.label, this.coins, this.color, this.emoji);
 }
-//да
