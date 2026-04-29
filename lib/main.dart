@@ -23,7 +23,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/auth/auth_screen.dart'; // ← добавили
-
+import 'screens/friends/friends_screen.dart';
+import 'screens/notifications/notifications_screen.dart';
+import 'core/services/presence_service.dart';
 /// 🔥 MAIN
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,11 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  final presence = PresenceService();
+  FirebaseAuth.instance.authStateChanges().listen((user) {
+    if (user != null) presence.setOnline();
+    // убрали else presence.setOffline()
+  });
   runApp(const MyApp());
 }
 
@@ -48,7 +55,8 @@ class MyApp extends StatelessWidget {
 
       routes: {
         "/": (context) => const HomeScreen(),
-
+        "/friends": (context) => const FriendsScreen(),
+        "/notifications": (context) => const NotificationsScreen(),
         /// 🧭 меню
         "/shop": (context) => const ShopScreen(),
         "/lobby": (context) =>
