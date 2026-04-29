@@ -13,6 +13,7 @@ class LeaderboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
 
     return Scaffold(
+<<<<<<< HEAD
       backgroundColor: const Color(0xFF060B1A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D1B35),
@@ -82,6 +83,7 @@ class LeaderboardScreen extends StatelessWidget {
             ),
           ),
         ),
+=======
 
       backgroundColor: const Color(0xff020617),
 
@@ -89,6 +91,7 @@ class LeaderboardScreen extends StatelessWidget {
         title: const Text("🌍 Global Ranking"),
         backgroundColor: Colors.transparent,
         elevation: 0,
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
       ),
 
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -96,6 +99,7 @@ class LeaderboardScreen extends StatelessWidget {
         stream: provider.getLeaderboard(),
         builder: (context, snapshot) {
 
+<<<<<<< HEAD
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
               child: Column(
@@ -125,6 +129,8 @@ class LeaderboardScreen extends StatelessWidget {
                     style: TextStyle(color: Colors.white38, fontSize: 13),
                   ),
                 ],
+=======
+          /// ⏳ Loading
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(),
@@ -137,10 +143,12 @@ class LeaderboardScreen extends StatelessWidget {
               child: Text(
                 "Ошибка: ${snapshot.error}",
                 style: const TextStyle(color: Colors.white),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
               ),
             );
           }
 
+<<<<<<< HEAD
           if (snapshot.hasError) {
             return Center(
               child: Column(
@@ -193,12 +201,14 @@ class LeaderboardScreen extends StatelessWidget {
                     style: TextStyle(color: Colors.white38, fontSize: 13),
                   ),
                 ],
+=======
           /// 📭 Empty
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(
               child: Text(
                 "Нет игроков 😢",
                 style: TextStyle(color: Colors.white),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
               ),
             );
           }
@@ -206,6 +216,7 @@ class LeaderboardScreen extends StatelessWidget {
           final players = snapshot.data!.docs;
 
           return ListView.builder(
+<<<<<<< HEAD
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             itemCount: players.length,
             itemBuilder: (context, index) {
@@ -217,6 +228,7 @@ class LeaderboardScreen extends StatelessWidget {
                 data: data,
                 index: index,
                 isCurrentUser: isMe,
+=======
 
             padding: const EdgeInsets.all(12),
 
@@ -311,6 +323,7 @@ class LeaderboardScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
               );
             },
           );
