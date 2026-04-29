@@ -46,7 +46,7 @@ class TugOfWarScreen extends StatelessWidget {
             _ModeCard(
               icon: '🤖',
               title: 'Против ИИ',
-              subtitle: 'Тренируйся против бота',
+              subtitle: '3 уровня сложности • Комбо-система • Буст',
               color: const Color(0xFF00C896),
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const TugOfWarAIScreen())),
@@ -55,7 +55,7 @@ class TugOfWarScreen extends StatelessWidget {
             _ModeCard(
               icon: '🏠',
               title: 'Играть с другом',
-              subtitle: 'Создай комнату или войди по коду',
+              subtitle: 'Best of 5 раундов • Создай комнату или войди по коду',
               color: const Color(0xFF7B5DEF),
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const TugOfWarRoomScreen())),
@@ -104,10 +104,10 @@ class _ModeCardState extends State<_ModeCard> {
           decoration: BoxDecoration(
             color: const Color(0xFF2D1B4E),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: widget.color.withOpacity(0.5), width: 1.5),
+            border: Border.all(color: widget.color.withValues(alpha: 0.5), width: 1.5),
             boxShadow: [
               BoxShadow(
-                  color: widget.color.withOpacity(0.18),
+                  color: widget.color.withValues(alpha: 0.18),
                   blurRadius: 18,
                   offset: const Offset(0, 8)),
             ],
@@ -118,7 +118,7 @@ class _ModeCardState extends State<_ModeCard> {
                 width: 54,
                 height: 54,
                 decoration: BoxDecoration(
-                  color: widget.color.withOpacity(0.13),
+                  color: widget.color.withValues(alpha: 0.13),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Center(
@@ -138,7 +138,7 @@ class _ModeCardState extends State<_ModeCard> {
                     const SizedBox(height: 4),
                     Text(widget.subtitle,
                         style: const TextStyle(
-                            color: Colors.white38, fontSize: 13)),
+                            color: Colors.white38, fontSize: 12)),
                   ],
                 ),
               ),
