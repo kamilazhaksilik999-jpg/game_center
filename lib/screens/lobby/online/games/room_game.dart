@@ -1,415 +1,418 @@
-// football_multiplayer.dart
-// Пенальти онлайн — 2 игрока через Firestore
-//
-// Архитектура:
-//   • Authoritative Host — хост считает результат математически, пишет в Firestore
-//   • Визуальная физика запускается локально на обоих клиентах одновременно
-//   • StreamSubscription вместо StreamBuilder — нет rebuild всего дерева
-//   • Ticker (vsync) вместо Timer.periodic — нет drift
-//   • ValueNotifier — canvas и HUD обновляются изолированно
-//   • Умный shouldRepaint — не перерисовывает без изменений
-//   • Экран ожидания — единый стиль для хоста и гостя
+// lobby/online/games/room_game.dart
+<<<<<<< HEAD
+=======
 
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ─── Константы ────────────────────────────────────────────────────────────────
+<<<<<<< HEAD
+// ─── Константы ───────────────────────────────────────────────────────────────
 
-const double kFieldW      = 400.0;
-const double kFieldH      = 600.0;
-const double kGoalW       = 200.0;
-const double kGoalH       = 60.0;
-const double kGoalY       = 40.0;
-const double kBallR       = 16.0;
-const double kBallStartX  = kFieldW / 2;
-const double kBallStartY  = kFieldH - 100.0;
-const double kKeeperW     = 60.0;
-const double kKeeperH     = 60.0;
-const double kKeeperY     = kGoalY + kGoalH / 2;
-const double kArrowMaxLen = 90.0;
-const double kBallMaxSpeed = 22.0;
-const double kGravity     = 0.18;
+const int kOnlineCols = 13;
+const int kOnlineRows = 13;
+const double kOnlineCell = 40.0;
+const double kOnlineTankSize = 28.0;
+const double kOnlineBulletSize = 7.0;
+const double kOnlineMoveSpeed = 2.5;
+const double kOnlineBulletSpeed = 5.0;
 
-// ─── Роль и фазы ─────────────────────────────────────────────────────────────
+// ─── Направления ─────────────────────────────────────────────────────────────
 
-enum PlayerRole { host, guest }
-enum MatchPhase { waiting, keeperPhase, aiming, shooting, calculating, scored, missed, saved, result }
-enum TurnAction { shoot, keep }
+enum OnlineDir { up, down, left, right }
 
-// ─── Главный экран (меню) ─────────────────────────────────────────────────────
+Offset onlineDirOffset(OnlineDir d) => switch (d) {
+  OnlineDir.up    => const Offset(0, -1),
+  OnlineDir.down  => const Offset(0, 1),
+  OnlineDir.left  => const Offset(-1, 0),
+  OnlineDir.right => const Offset(1, 0),
+};
 
-class MultiplayerMenuScreen extends StatefulWidget {
-  const MultiplayerMenuScreen({super.key});
+double onlineDirAngle(OnlineDir d) => switch (d) {
+  OnlineDir.up    => 0,
+  OnlineDir.down  => pi,
+  OnlineDir.left  => -pi / 2,
+  OnlineDir.right => pi / 2,
+};
 
-  @override
-  State<MultiplayerMenuScreen> createState() => _MultiplayerMenuScreenState();
-}
+// ─── Генерация лабиринта ──────────────────────────────────────────────────────
 
-class _MultiplayerMenuScreenState extends State<MultiplayerMenuScreen>
-    with TickerProviderStateMixin {
-  final _nameController = TextEditingController(text: 'Игрок');
-  final _roomController = TextEditingController();
-  final _rng = Random();
-  bool _loading = false;
-  String? _error;
+List<List<bool>> generateOnlineMaze(int cols, int rows, Random rng) {
+  final walls = List.generate(rows, (_) => List.filled(cols, true));
 
-  late AnimationController _bgAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _bgAnim = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    )..repeat(reverse: true);
+  void carve(int cx, int cy) {
+    walls[cy][cx] = false;
+    final dirs = [
+      [0, -2], [0, 2], [-2, 0], [2, 0],
+    ]..shuffle(rng);
+    for (final d in dirs) {
+      final nx = cx + d[0];
+      final ny = cy + d[1];
+      if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && walls[ny][nx]) {
+        walls[cy + d[1] ~/ 2][cx + d[0] ~/ 2] = false;
+        carve(nx, ny);
+      }
+    }
   }
 
+  carve(1, 1);
+
+  for (int i = 0; i < (cols * rows) ~/ 8; i++) {
+    final rx = rng.nextInt(cols - 2) + 1;
+    final ry = rng.nextInt(rows - 2) + 1;
+    walls[ry][rx] = false;
+  }
+
+  // Стартовые позиции
+  walls[1][1] = false;
+  walls[1][2] = false;
+  walls[2][1] = false;
+  walls[rows - 2][cols - 2] = false;
+  walls[rows - 2][cols - 3] = false;
+  walls[rows - 3][cols - 2] = false;
+
+  return walls;
+}
+
+// ─── Пуля ────────────────────────────────────────────────────────────────────
+
+class OnlineBullet {
+  double x, y, vx, vy;
+  bool fromHost;
+
+  OnlineBullet({
+    required this.x,
+    required this.y,
+    required this.vx,
+    required this.vy,
+    required this.fromHost,
+  });
+
+  Map<String, dynamic> toMap() =>
+      {'x': x, 'y': y, 'vx': vx, 'vy': vy, 'fromHost': fromHost};
+
+  factory OnlineBullet.fromMap(Map m) => OnlineBullet(
+    x: (m['x'] as num).toDouble(),
+    y: (m['y'] as num).toDouble(),
+    vx: (m['vx'] as num).toDouble(),
+    vy: (m['vy'] as num).toDouble(),
+    fromHost: m['fromHost'] as bool,
+  );
+}
+
+// ─── Экран выбора комнаты ─────────────────────────────────────────────────────
+=======
+const int _kMaxPos  = 10;
+const int _kGameSec = 30;
+
+// ── Экран создания / входа ────────────────────────────────────────────────────
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
+
+class RoomGameScreen extends StatefulWidget {
+  const RoomGameScreen({super.key});
+
+  @override
+  State<RoomGameScreen> createState() => _RoomGameScreenState();
+}
+
+class _RoomGameScreenState extends State<RoomGameScreen> {
+  final _ctrl = TextEditingController();
+  String? _error;
+  bool _loading = false;
+  final _rng = Random();
+
+<<<<<<< HEAD
   @override
   void dispose() {
-    _bgAnim.dispose();
-    _nameController.dispose();
-    _roomController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
-  String _generateRoomCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    return List.generate(4, (_) => chars[_rng.nextInt(chars.length)]).join();
+  String _generateCode() {
+    const chars = '123456789';
+    return List.generate(6, (_) => chars[_rng.nextInt(chars.length)]).join();
+=======
+  String _generateCode() {
+    final rng = Random();
+    return List.generate(6, (_) => rng.nextInt(10).toString()).join();
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
   }
 
+  // Генерируем seed лабиринта чтобы у обоих был одинаковый
+  int _generateSeed() => _rng.nextInt(999999);
+
   Future<void> _createRoom() async {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) {
-      setState(() => _error = 'Введите имя игрока');
-      return;
-    }
     setState(() { _loading = true; _error = null; });
+    final code = _generateCode();
+    final seed = _generateSeed();
 
-    final code = _generateRoomCode();
+<<<<<<< HEAD
+    // ── Firebase: создать документ комнаты ──
+    // await FirebaseFirestore.instance.collection('tank_rooms').doc(code).set({
+    //   'host': 'player1',
+    //   'guest': null,
+    //   'status': 'waiting',
+    //   'maze_seed': seed,   // ← seed для одинакового лабиринта
+    //   'host_x': 1.0, 'host_y': 1.0, 'host_angle': 0.0, 'host_hp': 3,
+    //   'guest_x': 11.0, 'guest_y': 11.0, 'guest_angle': 3.14, 'guest_hp': 3,
+    //   'bullets': [],
+    //   'created_at': FieldValue.serverTimestamp(),
+    // });
 
-    await FirebaseFirestore.instance.collection('football_rooms').doc(code).set({
-      'hostName'      : name,
-      'guestName'     : null,
-      'guestJoined'   : false,
-      'hostScore'     : 0,
-      'guestScore'    : 0,
-      'round'         : 0,
-      'maxRounds'     : 5,
-      'shooterRole'   : 'host',
-      'keeperTargetX' : null,
-      'keeperReady'   : false,
-      'shotVelX'      : null,
-      'shotVelY'      : null,
-      'shotSpin'      : null,
-      'shotFired'     : false,
-      'roundResult'   : null,
-      'roundComplete' : false,
-      'gameOver'      : false,
-      'created_at'    : FieldValue.serverTimestamp(),
+    await Future.delayed(const Duration(milliseconds: 600));
+=======
+    await FirebaseFirestore.instance.collection('tank_rooms').doc(code).set({
+      'rope_pos'   : 0,
+      'p1_taps'    : 0,
+      'p2_taps'    : 0,
+      'p1_ready'   : false,
+      'p2_ready'   : false,
+      'p2_joined'  : false,
+      'status'     : 'waiting',
+      'winner'     : '',
+      'start_at'   : null,
+      'created_at' : FieldValue.serverTimestamp(),
     });
 
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
     setState(() => _loading = false);
     if (!mounted) return;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => FootballWaitingScreen(
-          roomCode: code,
-          playerName: name,
-          isHost: true,
-        ),
-      ),
-    );
+<<<<<<< HEAD
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => _WaitingRoomScreen(code: code, isHost: true, seed: seed),
+=======
+    Navigator.pushReplacement(context, MaterialPageRoute(
+      builder: (_) => _RoomWaitingScreen(code: code, isHost: true),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
+    ));
   }
 
   Future<void> _joinRoom() async {
-    final name = _nameController.text.trim();
-    final code = _roomController.text.trim().toUpperCase();
+    final code = _ctrl.text.trim();
 
-    if (name.isEmpty) {
-      setState(() => _error = 'Введите имя игрока');
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      setState(() => _error = 'Введи ровно 6 цифр');
       return;
     }
-    if (code.length != 4) {
-      setState(() => _error = 'Код комнаты — 4 символа');
-      return;
-    }
-
     setState(() { _loading = true; _error = null; });
 
+<<<<<<< HEAD
+    // ── Firebase: получить seed лабиринта из комнаты ──
+    // final doc = await FirebaseFirestore.instance.collection('tank_rooms').doc(code).get();
+    // if (!doc.exists || doc['status'] != 'waiting') {
+    //   setState(() { _error = 'Комната не найдена или уже занята'; _loading = false; });
+    //   return;
+    // }
+    // final seed = doc['maze_seed'] as int;
+    // await FirebaseFirestore.instance.collection('tank_rooms').doc(code).update({
+    //   'guest': 'player2', 'status': 'playing',
+    // });
+
+    final seed = 42; // заглушка — заменить на seed из Firebase
+    await Future.delayed(const Duration(milliseconds: 600));
+=======
     final doc = await FirebaseFirestore.instance
-        .collection('football_rooms')
-        .doc(code)
-        .get();
+        .collection('tank_rooms').doc(code).get();
 
-    if (!doc.exists) {
-      setState(() { _error = 'Комната не найдена: $code'; _loading = false; });
-      return;
-    }
-
-    final data = doc.data() as Map<String, dynamic>;
-    if (data['guestJoined'] == true) {
-      setState(() { _error = 'Комната уже заполнена'; _loading = false; });
+    if (!doc.exists || doc['status'] != 'waiting') {
+      setState(() { _error = 'Комната не найдена или уже занята'; _loading = false; });
       return;
     }
 
     await FirebaseFirestore.instance
-        .collection('football_rooms')
-        .doc(code)
-        .update({'guestName': name, 'guestJoined': true});
+        .collection('tank_rooms').doc(code)
+        .update({'p2_joined': true});
 
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
     setState(() => _loading = false);
     if (!mounted) return;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => FootballWaitingScreen(
-          roomCode: code,
-          playerName: name,
-          isHost: false,
-        ),
-      ),
-    );
+<<<<<<< HEAD
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => OnlineTankGame(code: code, isHost: false, seed: seed),
+=======
+    Navigator.pushReplacement(context, MaterialPageRoute(
+      builder: (_) => _RoomWaitingScreen(code: code, isHost: false),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
+    ));
   }
 
   @override
+<<<<<<< HEAD
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D1A),
-      body: AnimatedBuilder(
-        animation: _bgAnim,
-        builder: (context, child) {
-          return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color.lerp(const Color(0xFF0D0D1A), const Color(0xFF101020), _bgAnim.value)!,
-                  Color.lerp(const Color(0xFF111128), const Color(0xFF0A1020), _bgAnim.value)!,
-                ],
+      backgroundColor: const Color(0xFF1A1A2E),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: BackButton(color: Colors.white54),
+        title: const Text('Играть с другом',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            Container(
+              width: 90, height: 90,
+              decoration: BoxDecoration(
+                color: const Color(0xFF5B8DEF).withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                  child: Text('🎮', style: TextStyle(fontSize: 44))),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _loading ? null : _createRoom,
+                icon: const Icon(Icons.add_circle_outline, size: 22),
+                label: const Text('Создать комнату',
+                    style: TextStyle(fontSize: 17)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5B8DEF),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
               ),
             ),
-            child: child,
-          );
-        },
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-
-                  Container(
-                    width: 90, height: 90,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00C896).withOpacity(0.13),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: const Color(0xFF00C896).withOpacity(0.3), width: 2),
-                    ),
-                    child: const Center(
-                        child: Text('⚽', style: TextStyle(fontSize: 44))),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    'ПЕНАЛЬТИ',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 8,
-                    ),
-                  ),
-                  const Text(
-                    '2 ИГРОКА',
-                    style: TextStyle(
-                      color: Color(0xFF00C896),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 6,
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-
-                  _buildInput(_nameController, 'Ваше имя', Icons.person),
-                  const SizedBox(height: 24),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: _MenuButton(
-                      label: 'СОЗДАТЬ КОМНАТУ',
-                      icon: Icons.add_circle_outline_rounded,
-                      color: const Color(0xFF00C896),
-                      onTap: _loading ? null : _createRoom,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  Row(children: [
-                    const Expanded(child: Divider(color: Color(0xFF2A2A4A))),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('или',
-                          style: TextStyle(
-                              color: const Color(0xFF8888AA).withOpacity(0.5),
-                              fontSize: 14)),
-                    ),
-                    const Expanded(child: Divider(color: Color(0xFF2A2A4A))),
-                  ]),
-                  const SizedBox(height: 20),
-
-                  _buildInput(
-                    _roomController,
-                    'Код комнаты (4 символа)',
-                    Icons.meeting_room_outlined,
-                    caps: true,
-                    maxLen: 4,
-                  ),
-                  const SizedBox(height: 16),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: _MenuButton(
-                      label: 'ВОЙТИ В КОМНАТУ',
-                      icon: Icons.login_rounded,
-                      color: const Color(0xFF16213E),
-                      borderColor: const Color(0xFF00C896),
-                      textColor: const Color(0xFF00C896),
-                      onTap: _loading ? null : _joinRoom,
-                    ),
-                  ),
-
-                  if (_error != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
-                      ),
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
-                      ),
-                    ),
-                  ],
-
-                  if (_loading)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 24),
-                      child: CircularProgressIndicator(color: Color(0xFF00C896)),
-                    ),
-
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Один игрок создаёт комнату,\nвторой вводит 4-значный код',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: Color(0xFF444466), fontSize: 12, height: 1.5),
-                  ),
-                ],
+            const SizedBox(height: 28),
+            Row(children: [
+              const Expanded(child: Divider(color: Colors.white12)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text('или',
+                    style:
+                    TextStyle(color: Colors.white38, fontSize: 14)),
+              ),
+              const Expanded(child: Divider(color: Colors.white12)),
+            ]),
+            const SizedBox(height: 28),
+            TextField(
+              controller: _codeController,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                LengthLimitingTextInputFormatter(6),
+              ],
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 6,
+              ),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: 'XXXXXX',
+                hintStyle: TextStyle(
+                    color: Colors.white24, fontSize: 24, letterSpacing: 6),
+                filled: true,
+                fillColor: const Color(0xFF16213E),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                      color: Color(0xFF5B8DEF), width: 1.5),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                      color: Color(0xFF5B8DEF), width: 1.5),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide:
+                  const BorderSide(color: Colors.white54, width: 2),
+                ),
+                errorText: _error,
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInput(TextEditingController ctrl, String hint, IconData icon,
-      {bool caps = false, int? maxLen}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF16213E),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF00C896), width: 1.5),
-      ),
-      child: TextField(
-        controller: ctrl,
-        maxLength: maxLen,
-        textCapitalization:
-        caps ? TextCapitalization.characters : TextCapitalization.words,
-        style: TextStyle(
-            color: Colors.white,
-            fontSize: caps ? 22 : 16,
-            fontWeight: caps ? FontWeight.bold : FontWeight.normal,
-            letterSpacing: caps ? 6 : 0),
-        textAlign: caps ? TextAlign.center : TextAlign.start,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Color(0xFF444466)),
-          prefixIcon: caps ? null : Icon(icon, color: const Color(0xFF8888AA), size: 20),
-          border: InputBorder.none,
-          counterText: '',
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _loading ? null : _joinRoom,
+                icon: const Icon(Icons.login_rounded, size: 22),
+                label: const Text('Войти в комнату',
+                    style: TextStyle(fontSize: 17)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00C896),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.only(top: 24),
+                child:
+                CircularProgressIndicator(color: Color(0xFF5B8DEF)),
+              ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Экран ожидания — единый стиль для хоста и гостя
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Экран ожидания ───────────────────────────────────────────────────────────
 
-class FootballWaitingScreen extends StatefulWidget {
-  final String roomCode;
-  final String playerName;
+class _WaitingRoomScreen extends StatefulWidget {
+  final String code;
   final bool isHost;
+  final int seed;
 
-  const FootballWaitingScreen({
-    super.key,
-    required this.roomCode,
-    required this.playerName,
+  const _WaitingRoomScreen({
+    required this.code,
     required this.isHost,
+    required this.seed,
   });
 
   @override
-  State<FootballWaitingScreen> createState() => _FootballWaitingScreenState();
+  State<_WaitingRoomScreen> createState() => _WaitingRoomScreenState();
 }
 
-class _FootballWaitingScreenState extends State<FootballWaitingScreen> {
+class _WaitingRoomScreenState extends State<_WaitingRoomScreen> {
+  bool _guestJoined = false;
   StreamSubscription? _sub;
-  bool _opponentJoined = false;
 
   @override
   void initState() {
     super.initState();
-    _sub = FirebaseFirestore.instance
-        .collection('football_rooms')
-        .doc(widget.roomCode)
-        .snapshots()
-        .listen((snap) {
-      if (!snap.exists) return;
-      final d = snap.data() as Map<String, dynamic>;
-      final joined = d['guestJoined'] as bool? ?? false;
-      if (joined && !_opponentJoined) {
-        setState(() => _opponentJoined = true);
-        Future.delayed(const Duration(milliseconds: 700), () {
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => FootballGameScreen(
-                  roomCode: widget.roomCode,
-                  playerName: widget.playerName,
-                  role: widget.isHost ? PlayerRole.host : PlayerRole.guest,
-                ),
-              ),
-            );
-          }
-        });
-      }
+    _listenForGuest();
+  }
+
+  void _listenForGuest() {
+    // ── Firebase: слушаем статус комнаты ──
+    // _sub = FirebaseFirestore.instance
+    //     .collection('tank_rooms')
+    //     .doc(widget.code)
+    //     .snapshots()
+    //     .listen((snap) {
+    //   if (snap['status'] == 'playing') {
+    //     setState(() => _guestJoined = true);
+    //     Future.delayed(const Duration(seconds: 1), () {
+    //       if (mounted) Navigator.pushReplacement(context,
+    //         MaterialPageRoute(builder: (_) => OnlineTankGame(
+    //           code: widget.code, isHost: true, seed: widget.seed)));
+    //     });
+    //   }
+    // });
+
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _guestJoined = true);
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (_) => OnlineTankGame(
+                code: widget.code, isHost: true, seed: widget.seed)));
+      });
     });
   }
 
@@ -418,14 +421,916 @@ class _FootballWaitingScreenState extends State<FootballWaitingScreen> {
     _sub?.cancel();
     super.dispose();
   }
+=======
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
 
-  Future<void> _cancel() async {
-    if (widget.isHost) {
-      await FirebaseFirestore.instance
-          .collection('football_rooms')
-          .doc(widget.roomCode)
-          .delete();
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+<<<<<<< HEAD
+      backgroundColor: const Color(0xFF1A1A2E),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🏠', style: TextStyle(fontSize: 60)),
+            const SizedBox(height: 24),
+            const Text('Твоя комната',
+                style: TextStyle(color: Colors.white54, fontSize: 16)),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: widget.code));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Код скопирован!')),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 32, vertical: 18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16213E),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: const Color(0xFF5B8DEF), width: 2),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.code,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 38,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 10,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(Icons.copy, color: Colors.white38, size: 22),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('Нажми на код чтобы скопировать',
+                style: TextStyle(color: Colors.white24, fontSize: 12)),
+            const SizedBox(height: 40),
+            if (!_guestJoined) ...[
+              const CircularProgressIndicator(color: Color(0xFF5B8DEF)),
+              const SizedBox(height: 20),
+              const Text('Ожидаем друга...',
+                  style:
+                  TextStyle(color: Colors.white54, fontSize: 16)),
+            ] else ...[
+              const Icon(Icons.check_circle,
+                  color: Color(0xFF00C896), size: 48),
+              const SizedBox(height: 16),
+              const Text('Друг подключился! Начинаем...',
+                  style: TextStyle(
+                      color: Color(0xFF00C896), fontSize: 16)),
+            ],
+            const SizedBox(height: 40),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Отмена',
+                  style: TextStyle(color: Colors.white38)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Онлайн игра с лабиринтом ─────────────────────────────────────────────────
+
+class OnlineTankGame extends StatefulWidget {
+  final String code;
+  final bool isHost;
+  final int seed;
+
+  const OnlineTankGame({
+    super.key,
+    required this.code,
+    required this.isHost,
+    required this.seed,
+  });
+
+  @override
+  State<OnlineTankGame> createState() => _OnlineTankGameState();
+}
+
+class _OnlineTankGameState extends State<OnlineTankGame> {
+  late List<List<bool>> _walls;
+
+  // Позиции в клетках лабиринта
+  double myX = 1, myY = 1;
+  double oppX = 11, oppY = 11;
+  OnlineDir myDir = OnlineDir.right;
+  OnlineDir oppDir = OnlineDir.left;
+  int myHp = 3, oppHp = 3;
+
+  final List<OnlineBullet> _bullets = [];
+
+  Offset _joystickOrigin = Offset.zero;
+  Offset _joystickCurrent = Offset.zero;
+  bool _shootPressed = false;
+
+  Timer? _gameLoop;
+  StreamSubscription? _sub;
+
+  bool _gameOver = false;
+  bool? _iWon;
+  int myScore = 0;
+  int oppScore = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Оба игрока используют одинаковый seed → одинаковый лабиринт
+    _walls = generateOnlineMaze(kOnlineCols, kOnlineRows, Random(widget.seed));
+
+    if (!widget.isHost) {
+      myX = 11; myY = 11; myDir = OnlineDir.left;
+      oppX = 1; oppY = 1; oppDir = OnlineDir.right;
     }
+
+    _listenFirestore();
+    _gameLoop = Timer.periodic(const Duration(milliseconds: 16), _tick);
+  }
+
+  void _listenFirestore() {
+    // ── Firebase: подписка ──
+    // _sub = FirebaseFirestore.instance
+    //     .collection('tank_rooms')
+    //     .doc(widget.code)
+    //     .snapshots()
+    //     .listen((snap) {
+    //   if (!mounted) return;
+    //   setState(() {
+    //     final myPrefix  = widget.isHost ? 'host' : 'guest';
+    //     final oppPrefix = widget.isHost ? 'guest' : 'host';
+    //     myHp  = snap['${myPrefix}_hp']  ?? 3;
+    //     oppHp = snap['${oppPrefix}_hp'] ?? 3;
+    //     oppX  = (snap['${oppPrefix}_x']  as num).toDouble();
+    //     oppY  = (snap['${oppPrefix}_y']  as num).toDouble();
+    //     final raw = snap['bullets'] as List? ?? [];
+    //     _bullets..clear()..addAll(raw.map((b) => OnlineBullet.fromMap(b)));
+    //     if (myHp <= 0)  _endGame(false);
+    //     if (oppHp <= 0) _endGame(true);
+    //   });
+    // });
+  }
+
+  void _tick(Timer _) {
+    if (_gameOver) return;
+    setState(() {
+      _moveMe();
+      _moveBullets();
+      _checkCollisions();
+      _pushState();
+    });
+  }
+
+  bool _canMoveFull(double nx, double ny) {
+    const r = 0.35;
+    for (final corner in [
+      [nx - r, ny - r], [nx + r, ny - r],
+      [nx - r, ny + r], [nx + r, ny + r],
+    ]) {
+      final cx = corner[0].round();
+      final cy = corner[1].round();
+      if (cx < 0 || cy < 0 || cx >= kOnlineCols || cy >= kOnlineRows) return false;
+      if (_walls[cy][cx]) return false;
+    }
+    return true;
+  }
+
+  void _moveMe() {
+    OnlineDir? moveDir;
+
+    // Джойстик
+    if (_joystickOrigin != Offset.zero && _joystickCurrent != Offset.zero) {
+      final delta = _joystickCurrent - _joystickOrigin;
+      if (delta.distance > 12) {
+        final angle = atan2(delta.dy, delta.dx);
+        if (angle.abs() < pi / 4) moveDir = OnlineDir.right;
+        else if ((angle - pi).abs() < pi / 4 || (angle + pi).abs() < pi / 4)
+          moveDir = OnlineDir.left;
+        else if (angle > 0) moveDir = OnlineDir.down;
+        else moveDir = OnlineDir.up;
+      }
+    }
+
+    if (moveDir != null) {
+      myDir = moveDir;
+      final step = onlineDirOffset(moveDir) * (kOnlineMoveSpeed / kOnlineCell);
+      final nx = myX + step.dx;
+      final ny = myY + step.dy;
+      if (_canMoveFull(nx, ny)) {
+        myX = nx;
+        myY = ny;
+      }
+    }
+
+    if (_shootPressed) {
+      _shootPressed = false;
+      _shoot();
+    }
+  }
+
+  void _shoot() {
+    if (_gameOver) return;
+    if (_bullets.where((b) => b.fromHost == widget.isHost).length >= 3) return;
+    final dir = onlineDirOffset(myDir);
+    _bullets.add(OnlineBullet(
+      x: myX, y: myY,
+      vx: dir.dx * kOnlineBulletSpeed / kOnlineCell,
+      vy: dir.dy * kOnlineBulletSpeed / kOnlineCell,
+      fromHost: widget.isHost,
+    ));
+  }
+
+  void _moveBullets() {
+    for (final b in _bullets) {
+      b.x += b.vx;
+      b.y += b.vy;
+    }
+    _bullets.removeWhere((b) {
+      final bx = b.x.round();
+      final by = b.y.round();
+      if (bx < 0 || by < 0 || bx >= kOnlineCols || by >= kOnlineRows) return true;
+      return _walls[by][bx];
+    });
+  }
+
+  void _checkCollisions() {
+    final toRemove = <OnlineBullet>[];
+    for (final b in _bullets) {
+      if (b.fromHost == widget.isHost) {
+        // Моя пуля — попала в оппонента?
+        final dx = b.x - oppX;
+        final dy = b.y - oppY;
+        if (sqrt(dx * dx + dy * dy) < 0.6) {
+          oppHp--;
+          toRemove.add(b);
+          if (oppHp <= 0) _endGame(true);
+        }
+      } else {
+        // Чужая пуля — попала в меня?
+        final dx = b.x - myX;
+        final dy = b.y - myY;
+        if (sqrt(dx * dx + dy * dy) < 0.6) {
+          myHp--;
+          toRemove.add(b);
+          if (myHp <= 0) _endGame(false);
+        }
+      }
+    }
+    _bullets.removeWhere(toRemove.contains);
+  }
+
+  void _pushState() {
+    // ── Firebase: отправляем своё состояние ──
+    // final prefix = widget.isHost ? 'host' : 'guest';
+    // FirebaseFirestore.instance.collection('tank_rooms').doc(widget.code).update({
+    //   '${prefix}_x': myX,
+    //   '${prefix}_y': myY,
+    //   '${prefix}_hp': myHp,
+    //   'bullets': _bullets.map((b) => b.toMap()).toList(),
+    // });
+  }
+
+  void _endGame(bool won) {
+    _gameOver = true;
+    _iWon = won;
+    if (won) myScore++; else oppScore++;
+    _gameLoop?.cancel();
+  }
+
+  void _restartGame() {
+    _gameLoop?.cancel();
+    setState(() {
+      _walls = generateOnlineMaze(kOnlineCols, kOnlineRows, Random());
+      _bullets.clear();
+      _gameOver = false;
+      _iWon = null;
+      myHp = 3; oppHp = 3;
+      if (widget.isHost) {
+        myX = 1; myY = 1; myDir = OnlineDir.right;
+        oppX = 11; oppY = 11; oppDir = OnlineDir.left;
+      } else {
+        myX = 11; myY = 11; myDir = OnlineDir.left;
+        oppX = 1; oppY = 1; oppDir = OnlineDir.right;
+      }
+    });
+    _gameLoop = Timer.periodic(const Duration(milliseconds: 16), _tick);
+  }
+
+  @override
+  void dispose() {
+    _gameLoop?.cancel();
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final myColor = widget.isHost
+        ? const Color(0xFF00C896)
+        : const Color(0xFFFF3D3D);
+    final oppColor = widget.isHost
+        ? const Color(0xFFFF3D3D)
+        : const Color(0xFF00C896);
+
+    final mazeW = kOnlineCols * kOnlineCell;
+    final mazeH = kOnlineRows * kOnlineCell;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D0D1A),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── HUD ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+=======
+      backgroundColor: const Color(0xFF0D0D1A),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+          child: Column(
+            children: [
+              Row(
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                        color: Color(0xFF8888AA)),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+<<<<<<< HEAD
+                  _hpWidget('ВЫ', myHp, myColor),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16213E),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '$myScore : $oppScore',
+                      style: const TextStyle(
+                        color: Color(0xFFFFD700),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  ),
+                  _hpWidget('OPP', oppHp, oppColor),
+                  Text('${widget.code}',
+                      style: const TextStyle(
+                          color: Colors.white24, fontSize: 11)),
+                ],
+              ),
+            ),
+
+            // ── Арена ──
+            Expanded(
+              child: Center(
+                child: Stack(
+                  children: [
+                    Container(
+                      width: mazeW,
+                      height: mazeH,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A2E),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: myColor.withOpacity(0.08),
+                            blurRadius: 40,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      width: mazeW,
+                      height: mazeH,
+                      child: CustomPaint(
+                        painter: _OnlineMazePainter(
+                          walls: _walls,
+                          myX: myX, myY: myY, myDir: myDir, myColor: myColor,
+                          oppX: oppX, oppY: oppY, oppDir: oppDir, oppColor: oppColor,
+                          bullets: _bullets,
+                        ),
+                      ),
+                    ),
+                    if (_gameOver)
+                      Positioned.fill(child: _buildGameOver()),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Управление ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  GestureDetector(
+                    onPanStart: (d) => setState(() {
+                      _joystickOrigin = d.localPosition;
+                      _joystickCurrent = d.localPosition;
+                    }),
+                    onPanUpdate: (d) =>
+                        setState(() => _joystickCurrent = d.localPosition),
+                    onPanEnd: (_) => setState(() {
+                      _joystickOrigin = Offset.zero;
+                      _joystickCurrent = Offset.zero;
+                    }),
+                    child: _OnlineJoystick(
+                      origin: _joystickOrigin == Offset.zero
+                          ? null
+                          : _joystickOrigin,
+                      current: _joystickCurrent == Offset.zero
+                          ? null
+                          : _joystickCurrent,
+                    ),
+=======
+                  const Expanded(
+                    child: Text(
+                      'Гонка по лабиринту с другом',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              Container(
+                width: 90, height: 90,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00C896).withOpacity(0.13),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: const Color(0xFF00C896).withOpacity(0.3), width: 2),
+                ),
+                child: const Center(
+                    child: Text('🌀', style: TextStyle(fontSize: 46))),
+              ),
+              const SizedBox(height: 28),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _loading ? null : _createRoom,
+                  icon: const Icon(Icons.add_circle_outline),
+                  label: const Text('Создать комнату',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00C896),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor:
+                    const Color(0xFF00C896).withOpacity(0.4),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
+                  ),
+                  GestureDetector(
+                    onTapDown: (_) =>
+                        setState(() => _shootPressed = true),
+                    child: Container(
+                      width: 72, height: 72,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFEF5B5B),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFEF5B5B).withOpacity(0.45),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                          Icons.local_fire_department_rounded,
+                          color: Colors.white, size: 36),
+                    ),
+                  ),
+                ],
+              ),
+<<<<<<< HEAD
+            ),
+          ],
+=======
+
+              const SizedBox(height: 24),
+              Row(children: [
+                const Expanded(child: Divider(color: Color(0xFF2A2A4A))),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('или',
+                      style: TextStyle(
+                          color: const Color(0xFF8888AA).withOpacity(0.5),
+                          fontSize: 14)),
+                ),
+                const Expanded(child: Divider(color: Color(0xFF2A2A4A))),
+              ]),
+              const SizedBox(height: 24),
+
+              TextField(
+                controller: _ctrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 6),
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  hintText: '000000',
+                  hintStyle: const TextStyle(
+                      color: Color(0xFF444466), fontSize: 24, letterSpacing: 6),
+                  filled: true,
+                  fillColor: const Color(0xFF16213E),
+                  errorText: _error,
+                  errorStyle:
+                  const TextStyle(color: Colors.redAccent, fontSize: 13),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide:
+                      const BorderSide(color: Color(0xFF00C896), width: 1.5)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide:
+                      const BorderSide(color: Color(0xFF00C896), width: 1.5)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide:
+                      const BorderSide(color: Colors.white54, width: 2)),
+                  errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide:
+                      const BorderSide(color: Colors.redAccent, width: 1.5)),
+                  focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide:
+                      const BorderSide(color: Colors.redAccent, width: 2)),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _loading ? null : _joinRoom,
+                  icon: const Icon(Icons.login_rounded),
+                  label: const Text('Войти в комнату',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16213E),
+                    foregroundColor: const Color(0xFF00C896),
+                    disabledForegroundColor:
+                    const Color(0xFF00C896).withOpacity(0.4),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: const BorderSide(
+                            color: Color(0xFF00C896), width: 1.5)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 24),
+                  child: CircularProgressIndicator(color: Color(0xFF00C896)),
+                ),
+            ],
+          ),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
+        ),
+      ),
+    );
+  }
+<<<<<<< HEAD
+
+  Widget _hpWidget(String label, int hp, Color color) {
+    return Column(children: [
+      Text(label,
+          style: TextStyle(
+              color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+      Row(children: List.generate(3, (i) =>
+          Icon(i < hp ? Icons.favorite : Icons.favorite_border,
+              color: color, size: 18))),
+    ]);
+  }
+
+  Widget _buildGameOver() {
+    final won = _iWon ?? false;
+    return Container(
+      color: Colors.black.withOpacity(0.8),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              won ? '🏆 ВЫ ПОБЕДИЛИ!' : '💀 ВЫ ПРОИГРАЛИ',
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                color: won
+                    ? const Color(0xFFFFD700)
+                    : const Color(0xFFFF3D3D),
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: _restartGame,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00C896),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 36, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Ещё раз',
+                  style:
+                  TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('В меню',
+                  style: TextStyle(color: Colors.white54)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Painter лабиринта ────────────────────────────────────────────────────────
+
+class _OnlineMazePainter extends CustomPainter {
+  final List<List<bool>> walls;
+  final double myX, myY, oppX, oppY;
+  final OnlineDir myDir, oppDir;
+  final Color myColor, oppColor;
+  final List<OnlineBullet> bullets;
+
+  _OnlineMazePainter({
+    required this.walls,
+    required this.myX, required this.myY,
+    required this.myDir, required this.myColor,
+    required this.oppX, required this.oppY,
+    required this.oppDir, required this.oppColor,
+    required this.bullets,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _drawWalls(canvas);
+    _drawTank(canvas, myX, myY, myDir, myColor);
+    _drawTank(canvas, oppX, oppY, oppDir, oppColor);
+    _drawBullets(canvas);
+  }
+
+  void _drawWalls(Canvas canvas) {
+    final wallPaint = Paint()
+      ..color = const Color(0xFF2A2A4A)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = const Color(0xFF3A3A6A)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5;
+
+    for (int y = 0; y < walls.length; y++) {
+      for (int x = 0; x < walls[y].length; x++) {
+        if (walls[y][x]) {
+          final rect = Rect.fromLTWH(
+              x * kOnlineCell, y * kOnlineCell,
+              kOnlineCell, kOnlineCell);
+          canvas.drawRect(rect, wallPaint);
+          canvas.drawRect(rect, borderPaint);
+        }
+      }
+    }
+  }
+
+  void _drawTank(Canvas canvas, double gx, double gy,
+      OnlineDir dir, Color color) {
+    final cx = gx * kOnlineCell + kOnlineCell / 2;
+    final cy = gy * kOnlineCell + kOnlineCell / 2;
+
+    canvas.save();
+    canvas.translate(cx, cy);
+    canvas.rotate(onlineDirAngle(dir));
+
+    final bodyPaint = Paint()..color = color;
+    final darkPaint = Paint()..color = color.withOpacity(0.6);
+    final barrelPaint = Paint()
+      ..color = color
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final trackPaint = Paint()..color = color.withOpacity(0.4);
+
+    const half = kOnlineTankSize / 2;
+
+    // Корпус
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+            center: Offset.zero,
+            width: kOnlineTankSize * 0.85,
+            height: kOnlineTankSize * 0.7),
+        const Radius.circular(4),
+      ),
+      bodyPaint,
+    );
+    // Башня
+    canvas.drawCircle(Offset.zero, kOnlineTankSize * 0.22, darkPaint);
+    // Ствол
+    canvas.drawLine(Offset.zero, Offset(0, -half), barrelPaint);
+    // Гусеницы
+    canvas.drawRect(
+        Rect.fromLTWH(-half * 0.95, -kOnlineTankSize * 0.32,
+            kOnlineTankSize * 0.15, kOnlineTankSize * 0.64),
+        trackPaint);
+    canvas.drawRect(
+        Rect.fromLTWH(half * 0.7, -kOnlineTankSize * 0.32,
+            kOnlineTankSize * 0.15, kOnlineTankSize * 0.64),
+        trackPaint);
+
+    canvas.restore();
+  }
+
+  void _drawBullets(Canvas canvas) {
+    for (final b in bullets) {
+      final cx = b.x * kOnlineCell + kOnlineCell / 2;
+      final cy = b.y * kOnlineCell + kOnlineCell / 2;
+      final color = b.fromHost
+          ? const Color(0xFFFFFF88)
+          : const Color(0xFFFF6666);
+
+      canvas.drawCircle(
+          Offset(cx, cy),
+          kOnlineBulletSize / 2,
+          Paint()..color = color);
+      canvas.drawCircle(
+          Offset(cx, cy),
+          kOnlineBulletSize,
+          Paint()..color = color.withOpacity(0.3));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _OnlineMazePainter old) => true;
+}
+
+// ─── Джойстик ────────────────────────────────────────────────────────────────
+
+class _OnlineJoystick extends StatelessWidget {
+  final Offset? origin;
+  final Offset? current;
+
+  const _OnlineJoystick({this.origin, this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    Offset thumbOffset = Offset.zero;
+    if (origin != null && current != null) {
+      final delta = current! - origin!;
+      final clamped =
+      delta.distance > 36 ? delta / delta.distance * 36 : delta;
+      thumbOffset = clamped;
+    }
+
+    return SizedBox(
+      width: 110, height: 110,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 100, height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF16213E),
+              border: Border.all(
+                  color: const Color(0xFF00C896).withOpacity(0.3),
+                  width: 2),
+            ),
+          ),
+          Transform.translate(
+            offset: thumbOffset,
+            child: Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF00C896).withOpacity(0.85),
+                boxShadow: [
+                  BoxShadow(
+                      color: const Color(0xFF00C896).withOpacity(0.4),
+                      blurRadius: 12),
+                ],
+              ),
+=======
+}
+
+// ── Экран ожидания ────────────────────────────────────────────────────────────
+
+class _RoomWaitingScreen extends StatefulWidget {
+  final String code;
+  final bool   isHost;
+  const _RoomWaitingScreen({required this.code, required this.isHost});
+
+  @override
+  State<_RoomWaitingScreen> createState() => _RoomWaitingScreenState();
+}
+
+class _RoomWaitingScreenState extends State<_RoomWaitingScreen> {
+  StreamSubscription? _sub;
+  bool _isSyncing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = FirebaseFirestore.instance
+        .collection('tank_rooms')
+        .doc(widget.code)
+        .snapshots()
+        .listen((snap) {
+      if (!snap.exists || _isSyncing) return;
+      final d = snap.data() as Map<String, dynamic>;
+
+      if (widget.isHost) {
+        final joined = d['p2_joined'] as bool? ?? false;
+        if (joined) {
+          _isSyncing = true;
+          FirebaseFirestore.instance
+              .collection('tank_rooms')
+              .doc(widget.code)
+              .update({'p1_ready': true});
+
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (mounted) {
+              Navigator.pushReplacement(context, MaterialPageRoute(
+                builder: (_) =>
+                    RoomOnlineGame(roomId: widget.code, isHost: true),
+              ));
+            }
+          });
+        }
+      } else {
+        final p1Ready = d['p1_ready'] as bool? ?? false;
+        if (p1Ready) {
+          _isSyncing = true;
+          FirebaseFirestore.instance
+              .collection('tank_rooms')
+              .doc(widget.code)
+              .update({'p2_ready': true});
+
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (mounted) {
+              Navigator.pushReplacement(context, MaterialPageRoute(
+                builder: (_) =>
+                    RoomOnlineGame(roomId: widget.code, isHost: false),
+              ));
+            }
+          });
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() { _sub?.cancel(); super.dispose(); }
+
+  Future<void> _cancelRoom() async {
+    await FirebaseFirestore.instance
+        .collection('tank_rooms').doc(widget.code).delete();
     if (mounted) Navigator.pop(context);
   }
 
@@ -433,1399 +1338,687 @@ class _FootballWaitingScreenState extends State<FootballWaitingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D1A),
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Text('⚽', style: TextStyle(fontSize: 64)),
-              const SizedBox(height: 24),
+      body: Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('🌀', style: TextStyle(fontSize: 64)),
+          const SizedBox(height: 24),
+          const Text('Твоя комната',
+              style: TextStyle(color: Color(0xFF8888AA), fontSize: 16)),
+          const SizedBox(height: 12),
 
-              Text(
-                widget.isHost ? 'Твоя комната' : 'Подключение...',
-                style: const TextStyle(color: Colors.white54, fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-
-              if (widget.isHost) ...[
-                GestureDetector(
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: widget.roomCode));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Код скопирован!'),
-                          duration: Duration(seconds: 2)),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16213E),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF00C896), width: 2),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.roomCode,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 42,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 10,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Icon(Icons.copy, color: Colors.white38, size: 22),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Нажми, чтобы скопировать',
-                  style: TextStyle(color: Colors.white24, fontSize: 12),
-                ),
-                const SizedBox(height: 40),
-              ] else
-                const SizedBox(height: 20),
-
-              if (!_opponentJoined) ...[
-                const CircularProgressIndicator(color: Color(0xFF00C896)),
-                const SizedBox(height: 20),
-                Text(
-                  widget.isHost ? 'Ожидаем друга...' : 'Подключаемся к комнате...',
-                  style: const TextStyle(color: Colors.white54, fontSize: 16),
-                ),
-                if (widget.isHost) ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Поделись кодом с другом',
-                    style: TextStyle(color: Colors.white24, fontSize: 13),
-                  ),
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: widget.code));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Код скопирован!'),
+                backgroundColor: Color(0xFF16213E),
+              ));
+            },
+            child: Container(
+              padding:
+              const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16213E),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF00C896), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                      color: const Color(0xFF00C896).withOpacity(0.15),
+                      blurRadius: 20,
+                      spreadRadius: 2)
                 ],
-              ] else ...[
-                const Icon(Icons.check_circle, color: Color(0xFF00C896), size: 48),
-                const SizedBox(height: 12),
-                const Text(
-                  'Игра начинается!',
-                  style: TextStyle(color: Color(0xFF00C896), fontSize: 16),
-                ),
-              ],
-
-              const SizedBox(height: 36),
-              TextButton(
-                onPressed: _cancel,
-                child: const Text('Отмена',
-                    style: TextStyle(color: Colors.redAccent, fontSize: 15)),
               ),
-            ]),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(widget.code,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 10)),
+                const SizedBox(width: 10),
+                const Icon(Icons.copy, color: Color(0xFF8888AA), size: 20),
+              ]),
+            ),
           ),
-        ),
-      ),
-    );
-  }
-}
+          const SizedBox(height: 8),
+          const Text('Нажми чтобы скопировать',
+              style: TextStyle(color: Color(0xFF444466), fontSize: 12)),
+          const SizedBox(height: 40),
 
-// ─── Кнопка меню ─────────────────────────────────────────────────────────────
-
-class _MenuButton extends StatefulWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final Color? borderColor;
-  final Color? textColor;
-  final VoidCallback? onTap;
-
-  const _MenuButton({
-    required this.label,
-    required this.icon,
-    required this.color,
-    this.borderColor,
-    this.textColor,
-    required this.onTap,
-  });
-
-  @override
-  State<_MenuButton> createState() => _MenuButtonState();
-}
-
-class _MenuButtonState extends State<_MenuButton> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasBorder = widget.borderColor != null;
-    return GestureDetector(
-      onTapDown: widget.onTap != null ? (_) => setState(() => _pressed = true) : null,
-      onTapUp: widget.onTap != null
-          ? (_) { setState(() => _pressed = false); widget.onTap!(); }
-          : null,
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1.0,
-        duration: const Duration(milliseconds: 80),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          decoration: BoxDecoration(
-            color: widget.color,
-            borderRadius: BorderRadius.circular(14),
-            border: hasBorder
-                ? Border.all(color: widget.borderColor!, width: 1.5)
-                : null,
-            boxShadow: hasBorder
-                ? null
-                : [
-              BoxShadow(
-                color: widget.color.withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(widget.icon, color: widget.textColor ?? Colors.white, size: 22),
-              const SizedBox(width: 10),
-              Text(
-                widget.label,
+          if (!_isSyncing) ...[
+            const CircularProgressIndicator(color: Color(0xFF00C896)),
+            const SizedBox(height: 20),
+            Text(
+              widget.isHost ? 'Ожидаем друга...' : 'Синхронизация с хостом...',
+              style: const TextStyle(color: Color(0xFF8888AA), fontSize: 16),
+            ),
+          ] else ...[
+            const Icon(Icons.check_circle, color: Color(0xFF00C896), size: 48),
+            const SizedBox(height: 12),
+            const Text('Подключено! Запуск...',
                 style: TextStyle(
-                  color: widget.textColor ?? Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 2,
-                ),
-              ),
-            ],
+                    color: Color(0xFF00C896),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold)),
+          ],
+
+          const SizedBox(height: 32),
+          TextButton(
+            onPressed: _cancelRoom,
+            child: const Text('Отмена',
+                style: TextStyle(
+                    color: Color(0xFFEF5B5B), fontWeight: FontWeight.bold)),
           ),
-        ),
+        ]),
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Игровой экран
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── Онлайн игра ───────────────────────────────────────────────────────────────
 
-class FootballGameScreen extends StatefulWidget {
-  final String roomCode;
-  final String playerName;
-  final PlayerRole role;
-
-  const FootballGameScreen({
-    super.key,
-    required this.roomCode,
-    required this.playerName,
-    required this.role,
-  });
+class RoomOnlineGame extends StatefulWidget {
+  final String roomId;
+  final bool   isHost;
+  const RoomOnlineGame(
+      {super.key, required this.roomId, required this.isHost});
 
   @override
-  State<FootballGameScreen> createState() => _FootballGameScreenState();
+  State<RoomOnlineGame> createState() => _RoomOnlineGameState();
 }
 
-class _FootballGameScreenState extends State<FootballGameScreen>
-    with TickerProviderStateMixin {
+enum _Phase { waiting, countdown, playing, gameOver }
 
-  // ── Локальная физика ────────────────────────────────────────────────────
-  Offset _ball      = const Offset(kBallStartX, kBallStartY);
-  Offset _ballVel   = Offset.zero;
-  double _ballSpin  = 0;
-  double _ballScale = 1.0;
-  double _keeperX   = kFieldW / 2;
+class _RoomOnlineGameState extends State<RoomOnlineGame>
+    with SingleTickerProviderStateMixin {
 
-  // ── Прицел ──────────────────────────────────────────────────────────────
-  Offset? _dragStart;
-  Offset? _dragCurrent;
+  // ── Состояние ──────────────────────────────────────────────────────────────
+  _Phase _localPhase = _Phase.waiting;
+  bool   _finished   = false;
 
-  // ── Фаза матча ──────────────────────────────────────────────────────────
-  MatchPhase _phase    = MatchPhase.waiting;
-  TurnAction _myAction = TurnAction.shoot;
+  double _ropePos  = 0;
+  int    _p1Taps   = 0;
+  int    _p2Taps   = 0;
+  int    _countdown = 3;
+  int    _timeLeft  = _kGameSec;
+  String _winner   = '';
 
-  // ── Вратарь ─────────────────────────────────────────────────────────────
-  double _myKeeperTarget = kFieldW / 2;
-  bool   _keeperDecided  = false;
-  bool   _physicsStarted = false;
+  Timer?              _countdownTimer;
+  Timer?              _gameTimer;
+  StreamSubscription? _roomSub; // ✅ подписка вместо StreamBuilder
 
-  // ── Анимация (гол/мимо/сэйв) ────────────────────────────────────────────
-  late AnimationController _scorePopController;
-  late Animation<double>   _scorePopAnim;
-  bool   _showScorePop  = false;
-  String _scorePopText  = '';
-  Color  _scorePopColor = Colors.white;
+  late AnimationController _tapCtrl;
+  late Animation<double>   _tapScale;
 
-  String? _statusMessage;
+  String get _myTapsField => widget.isHost ? 'p1_taps' : 'p2_taps';
 
-  // ── Firestore ────────────────────────────────────────────────────────────
-  StreamSubscription? _sub;
-  Map<String, dynamic> _lastData = {};
-
-  // ── Ticker для визуальной физики ─────────────────────────────────────────
-  Ticker? _physicsTicker;
-  bool    _physicsRunning  = false;
-  double  _shotSpin        = 0;
-  double  _shotKeeperTarget = kFieldW / 2;
-
-  // ── ValueNotifier'ы ──────────────────────────────────────────────────────
-  final _repaint    = ValueNotifier<int>(0);
-  final _hudRefresh = ValueNotifier<int>(0);
-
-  DocumentReference get _roomRef =>
-      FirebaseFirestore.instance.collection('football_rooms').doc(widget.roomCode);
-
-  bool get _isHost => widget.role == PlayerRole.host;
-
+  // ── initState ──────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
 
-    _scorePopController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 800));
-    _scorePopAnim =
-        CurvedAnimation(parent: _scorePopController, curve: Curves.elasticOut);
+    _tapCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 100));
+    _tapScale = Tween<double>(begin: 1.0, end: 0.88)
+        .animate(CurvedAnimation(parent: _tapCtrl, curve: Curves.easeOut));
 
-    _listenRoom();
+    // ✅ Слушаем Firestore через подписку — никакого setState внутри build
+    _roomSub = FirebaseFirestore.instance
+        .collection('tank_rooms')
+        .doc(widget.roomId)
+        .snapshots()
+        .listen((snap) {
+      if (!snap.exists || !mounted) return;
+      _handleSnapshot(snap.data() as Map<String, dynamic>);
+    });
   }
 
+  // ── dispose ────────────────────────────────────────────────────────────────
   @override
   void dispose() {
-    _sub?.cancel();
-    _physicsTicker?.dispose();
-    _scorePopController.dispose();
-    _repaint.dispose();
-    _hudRefresh.dispose();
+    _countdownTimer?.cancel();
+    _gameTimer?.cancel();
+    _roomSub?.cancel();
+    _tapCtrl.dispose();
     super.dispose();
   }
 
-  // ─── Подписка на Firestore ────────────────────────────────────────────────
-  void _listenRoom() {
-    _sub = _roomRef.snapshots().listen((snap) {
-      if (!snap.exists || !mounted) return;
-      final d = snap.data() as Map<String, dynamic>;
-      _lastData = d;
-      _syncFromData(d);
+  // ── Обработка снапшота (вызывается из подписки, не из build) ──────────────
+  void _handleSnapshot(Map<String, dynamic> d) {
+    final status  = d['status']   as String? ?? 'waiting';
+    final p1Ready = d['p1_ready'] as bool?   ?? false;
+    final p2Ready = d['p2_ready'] as bool?   ?? false;
+
+    // Обновляем данные
+    setState(() {
+      _ropePos = (d['rope_pos'] as num?)?.toDouble() ?? 0;
+      _p1Taps  = (d['p1_taps']  as num?)?.toInt()    ?? 0;
+      _p2Taps  = (d['p2_taps']  as num?)?.toInt()    ?? 0;
+      _winner  = d['winner']    as String?            ?? '';
+    });
+
+    // Хост запускает отсчёт когда оба готовы
+    if (p1Ready && p2Ready && status == 'waiting' && widget.isHost) {
+      FirebaseFirestore.instance
+          .collection('tank_rooms')
+          .doc(widget.roomId)
+          .update({'status': 'countdown'});
+    }
+
+    if (status == 'countdown' && _localPhase == _Phase.waiting) {
+      setState(() => _localPhase = _Phase.countdown);
+      _startCountdown();
+    }
+
+    if (status == 'playing' && _localPhase == _Phase.countdown) {
+      setState(() => _localPhase = _Phase.playing);
+      _startGameTimer();
+    }
+
+    if (status == 'finished' && !_finished) {
+      _finished = true;
+      setState(() => _localPhase = _Phase.gameOver);
+    }
+  }
+
+  // ── Таймеры ────────────────────────────────────────────────────────────────
+  void _startCountdown() {
+    _countdown = 3;
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) { t.cancel(); return; }
+      if (_countdown <= 1) {
+        t.cancel();
+        if (widget.isHost) {
+          FirebaseFirestore.instance
+              .collection('tank_rooms')
+              .doc(widget.roomId)
+              .update({'status': 'playing'});
+        }
+      } else {
+        setState(() => _countdown--);
+      }
     });
   }
 
-  void _syncFromData(Map<String, dynamic> d) {
-    final guestJoined = d['guestJoined'] as bool? ?? false;
-
-    if (!guestJoined) {
-      if (_phase != MatchPhase.waiting) {
-        _phase = MatchPhase.waiting;
-        _statusMessage = 'Ожидание второго игрока...';
-        _hudRefresh.value++;
-        if (mounted) setState(() {});
+  void _startGameTimer() {
+    _timeLeft = _kGameSec;
+    _gameTimer?.cancel();
+    _gameTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) { t.cancel(); return; }
+      if (_timeLeft <= 1) {
+        t.cancel();
+        if (widget.isHost) _resolveTimeout();
+      } else {
+        setState(() => _timeLeft--);
       }
-      return;
-    }
-
-    if (d['gameOver'] == true) {
-      if (_phase != MatchPhase.result) {
-        _phase = MatchPhase.result;
-        if (mounted) setState(() {});
-      }
-      return;
-    }
-
-    final shooterRole   = d['shooterRole'] as String? ?? 'host';
-    final shooterIsHost = shooterRole == 'host';
-    final iAmShooter =
-        (_isHost && shooterIsHost) || (!_isHost && !shooterIsHost);
-
-    if (d['roundComplete'] == true) {
-      if (_phase != MatchPhase.scored &&
-          _phase != MatchPhase.missed &&
-          _phase != MatchPhase.saved) {
-        _handleRoundResult(d['roundResult'] as String?, iAmShooter);
-      }
-      return;
-    }
-
-    final shotFired = d['shotFired'] as bool? ?? false;
-    if (shotFired && !_physicsStarted) {
-      final vx   = (d['shotVelX'] as num?)?.toDouble();
-      final vy   = (d['shotVelY'] as num?)?.toDouble();
-      final spin = (d['shotSpin'] as num?)?.toDouble() ?? 0.0;
-      final kt   = (d['keeperTargetX'] as num?)?.toDouble() ?? kFieldW / 2;
-
-      if (vx != null && vy != null) {
-        _physicsStarted = true;
-        _startLocalVisualPhysics(Offset(vx, vy), spin, kt);
-
-        if (_isHost) {
-          _calculateAndWriteResultAsHost(vx, vy, spin, kt, shooterIsHost, d);
-        }
-      }
-      return;
-    }
-
-    if (!shotFired) {
-      final keeperReady = d['keeperReady'] as bool? ?? false;
-
-      if (!iAmShooter && !keeperReady && !_keeperDecided) {
-        if (_phase != MatchPhase.keeperPhase) {
-          _phase         = MatchPhase.keeperPhase;
-          _statusMessage = 'Встань в ворота! Выбери позицию';
-          _myAction      = TurnAction.keep;
-          if (mounted) setState(() {});
-        }
-      } else if (iAmShooter && keeperReady) {
-        if (_phase != MatchPhase.aiming) {
-          _phase         = MatchPhase.aiming;
-          _statusMessage = null;
-          _myAction      = TurnAction.shoot;
-          if (mounted) setState(() {});
-        }
-      } else if (iAmShooter && !keeperReady) {
-        if (_phase != MatchPhase.waiting) {
-          _phase         = MatchPhase.waiting;
-          _statusMessage = 'Ожидание вратаря...';
-          if (mounted) setState(() {});
-        }
-      }
-    }
-  }
-
-  // ── Расчёт результата (только хост) ──────────────────────────────────────
-
-  Future<void> _calculateAndWriteResultAsHost(
-      double vx, double vy, double spin, double kt,
-      bool shooterIsHost, Map<String, dynamic> currentData) async {
-
-    Offset simBall = const Offset(kBallStartX, kBallStartY);
-    Offset simVel  = Offset(vx, vy);
-    String result  = 'missed';
-
-    for (int i = 0; i < 300; i++) {
-      simVel  = Offset(simVel.dx + spin * 0.05, simVel.dy);
-      simBall += simVel;
-      simVel  *= (1 - kGravity * 0.08);
-
-      if ((simBall.dx - kt).abs() < kKeeperW / 2 + kBallR &&
-          simBall.dy <= kKeeperY + kKeeperH / 2 + kBallR &&
-          simBall.dy >= kGoalY) {
-        result = 'saved';
-        break;
-      }
-
-      if (simBall.dy <= kGoalY + kGoalH) {
-        final inGoalX = simBall.dx >= kFieldW / 2 - kGoalW / 2 + kBallR &&
-            simBall.dx <= kFieldW / 2 + kGoalW / 2 - kBallR;
-        if (inGoalX) {
-          result = 'scored';
-          break;
-        }
-      }
-
-      if (simBall.dy < -kBallR * 2 ||
-          simBall.dx < -kBallR * 2 ||
-          simBall.dx > kFieldW + kBallR * 2) {
-        result = 'missed';
-        break;
-      }
-    }
-
-    int hostScore  = currentData['hostScore']  as int? ?? 0;
-    int guestScore = currentData['guestScore'] as int? ?? 0;
-
-    if (result == 'scored') {
-      if (shooterIsHost) hostScore++; else guestScore++;
-    } else {
-      if (!shooterIsHost) hostScore++; else guestScore++;
-    }
-
-    await _roomRef.update({
-      'hostScore'     : hostScore,
-      'guestScore'    : guestScore,
-      'roundResult'   : result,
-      'round'         : FieldValue.increment(1),
-      'roundComplete' : true,
     });
   }
 
-  void _handleRoundResult(String? result, bool iWasShooter) {
-    if (result == 'scored') {
-      _showPop(iWasShooter ? '⚽ ГОЛ!' : '😱 ГОЛ!',
-          iWasShooter ? const Color(0xFF00C896) : Colors.redAccent);
-    } else if (result == 'saved') {
-      _showPop(!iWasShooter ? '🧤 СЭЙВ!' : '🧤 Сэйв!',
-          !iWasShooter ? const Color(0xFF00C896) : Colors.redAccent);
-    } else {
-      _showPop('❌ МИМО!', const Color(0xFFFFD740));
-    }
-
-    _phase = result == 'scored'
-        ? MatchPhase.scored
-        : result == 'saved'
-        ? MatchPhase.saved
-        : MatchPhase.missed;
-    if (mounted) setState(() {});
-
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (!mounted) return;
-      if (_isHost) _nextRound();
+  void _resolveTimeout() {
+    FirebaseFirestore.instance
+        .collection('tank_rooms')
+        .doc(widget.roomId)
+        .get()
+        .then((snap) {
+      if (!snap.exists) return;
+      final pos    = (snap['rope_pos'] as num).toDouble();
+      final winner = pos < 0 ? 'p1' : pos > 0 ? 'p2' : 'draw';
+      FirebaseFirestore.instance
+          .collection('tank_rooms')
+          .doc(widget.roomId)
+          .update({'status': 'finished', 'winner': winner});
     });
   }
 
-  Future<void> _nextRound() async {
-    final snap = await _roomRef.get();
-    if (!snap.exists) return;
-    final d         = snap.data() as Map<String, dynamic>;
-    final round     = d['round'] as int? ?? 0;
-    final maxRounds = d['maxRounds'] as int? ?? 5;
+  // ── Нажатие кнопки ────────────────────────────────────────────────────────
+  void _onTap() {
+    if (_localPhase != _Phase.playing) return;
+    _tapCtrl.forward(from: 0).then((_) => _tapCtrl.reverse());
 
-    if (round >= maxRounds) {
-      await _roomRef.update({'gameOver': true});
-    } else {
-      final nextShooter =
-      (d['shooterRole'] as String? ?? 'host') == 'host' ? 'guest' : 'host';
-      await _roomRef.update({
-        'shooterRole'   : nextShooter,
-        'keeperTargetX' : null,
-        'keeperReady'   : false,
-        'shotVelX'      : null,
-        'shotVelY'      : null,
-        'shotSpin'      : null,
-        'shotFired'     : false,
-        'roundResult'   : null,
-        'roundComplete' : false,
+    final delta = widget.isHost ? -1 : 1;
+    FirebaseFirestore.instance
+        .collection('tank_rooms')
+        .doc(widget.roomId)
+        .update({
+      'rope_pos'  : FieldValue.increment(delta),
+      _myTapsField: FieldValue.increment(1),
+    }).then((_) {
+      FirebaseFirestore.instance
+          .collection('tank_rooms')
+          .doc(widget.roomId)
+          .get()
+          .then((snap) {
+        if (!snap.exists || _finished) return;
+        final pos = (snap['rope_pos'] as num).toDouble();
+        if (pos <= -_kMaxPos) {
+          _finished = true;
+          FirebaseFirestore.instance
+              .collection('tank_rooms')
+              .doc(widget.roomId)
+              .update({'status': 'finished', 'winner': 'p1'});
+        } else if (pos >= _kMaxPos) {
+          _finished = true;
+          FirebaseFirestore.instance
+              .collection('tank_rooms')
+              .doc(widget.roomId)
+              .update({'status': 'finished', 'winner': 'p2'});
+        }
       });
-    }
-
-    _resetLocalState();
-  }
-
-  void _resetLocalState() {
-    _physicsTicker?.stop();
-    _physicsRunning = false;
-
-    _ball           = const Offset(kBallStartX, kBallStartY);
-    _ballVel        = Offset.zero;
-    _ballSpin       = 0;
-    _ballScale      = 1.0;
-    _keeperX        = kFieldW / 2;
-    _myKeeperTarget = kFieldW / 2;
-    _keeperDecided  = false;
-    _physicsStarted = false;
-    _phase          = MatchPhase.waiting;
-    _statusMessage  = null;
-
-    if (mounted) setState(() {});
-  }
-
-  // ── Визуальная физика (Ticker) ────────────────────────────────────────────
-
-  void _startLocalVisualPhysics(Offset vel, double spin, double keeperTarget) {
-    _ball             = const Offset(kBallStartX, kBallStartY);
-    _ballVel          = vel;
-    _ballSpin         = spin;
-    _keeperX          = kFieldW / 2;
-    _shotSpin         = spin;
-    _shotKeeperTarget = keeperTarget;
-    _phase            = MatchPhase.shooting;
-
-    if (mounted) setState(() {});
-
-    _physicsTicker ??= createTicker(_onPhysicsTick);
-    _physicsRunning = true;
-    _physicsTicker!.start();
-  }
-
-  void _onPhysicsTick(Duration elapsed) {
-    if (!_physicsRunning || !mounted) return;
-
-    _ballVel  = Offset(_ballVel.dx + _ballSpin * 0.05, _ballVel.dy);
-    _ball    += _ballVel;
-    _ballVel *= (1 - kGravity * 0.08);
-    _ballScale = 1.0 - (_ball.dy - kBallStartY).abs() / (kFieldH * 4);
-
-    final dx = _shotKeeperTarget - _keeperX;
-    _keeperX += dx.sign * min(4.5, dx.abs());
-
-    final bx = _ball.dx;
-    final by = _ball.dy;
-    bool stop = false;
-
-    if (bx < -kBallR || bx > kFieldW + kBallR ||
-        by < -kBallR * 2 || by > kFieldH + kBallR) {
-      stop = true;
-    }
-
-    if (!stop && by <= kGoalY + kGoalH + kBallR) {
-      final caught = (bx - _keeperX).abs() < kKeeperW / 2 + kBallR &&
-          by <= kKeeperY + kKeeperH / 2 + kBallR;
-      if (caught || by < kGoalY - kBallR) stop = true;
-    }
-
-    if (stop) {
-      _physicsTicker!.stop();
-      _physicsRunning = false;
-      _phase          = MatchPhase.calculating;
-      _statusMessage  = 'Сверка результата...';
-      if (mounted) setState(() {});
-      return;
-    }
-
-    _repaint.value++;
-  }
-
-  // ── Ввод вратаря ──────────────────────────────────────────────────────────
-
-  void _onKeeperDrag(DragUpdateDetails d) {
-    if (_phase != MatchPhase.keeperPhase) return;
-    final box = context.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final local    = box.globalToLocal(d.globalPosition);
-    final screenW  = box.size.width;
-    final fieldOffX = (screenW - kFieldW) / 2;
-    final x = (local.dx - fieldOffX).clamp(
-      kFieldW / 2 - kGoalW / 2 + kKeeperW / 2,
-      kFieldW / 2 + kGoalW / 2 - kKeeperW / 2,
-    );
-    _myKeeperTarget = x;
-    _repaint.value++;
-  }
-
-  Future<void> _confirmKeeperPosition() async {
-    if (_keeperDecided) return;
-    _keeperDecided = true;
-    await _roomRef.update({
-      'keeperTargetX' : _myKeeperTarget,
-      'keeperReady'   : true,
-    });
-    _phase         = MatchPhase.waiting;
-    _statusMessage = 'Позиция зафиксирована! Ждём удара...';
-    if (mounted) setState(() {});
-  }
-
-  // ── Ввод бьющего ──────────────────────────────────────────────────────────
-
-  void _onDragStart(DragStartDetails d) {
-    if (_phase != MatchPhase.aiming) return;
-    final local = _toField(d.globalPosition);
-    if (local == null) return;
-    if ((local - _ball).distance < 50) {
-      _dragStart   = local;
-      _dragCurrent = local;
-      _repaint.value++;
-    }
-  }
-
-  void _onDragUpdate(DragUpdateDetails d) {
-    if (_phase != MatchPhase.aiming || _dragStart == null) return;
-    final local = _toField(d.globalPosition);
-    if (local == null) return;
-    _dragCurrent = local;
-    _repaint.value++;
-  }
-
-  Future<void> _onDragEnd(DragEndDetails _) async {
-    if (_phase != MatchPhase.aiming || _dragStart == null) return;
-    final ds    = _dragStart!;
-    final dc    = _dragCurrent!;
-    final delta = ds - dc;
-
-    _dragStart   = null;
-    _dragCurrent = null;
-
-    if (delta.distance < 10) {
-      _repaint.value++;
-      return;
-    }
-
-    final norm       = delta / delta.distance;
-    final power      = (delta.distance / kArrowMaxLen).clamp(0.0, 1.0);
-    final speed      = power * kBallMaxSpeed;
-    final spinFactor = delta.dx / kArrowMaxLen;
-    final vel        = norm * speed;
-
-    await _roomRef.update({
-      'shotVelX' : vel.dx,
-      'shotVelY' : vel.dy,
-      'shotSpin' : spinFactor * 2.5,
-      'shotFired': true,
     });
   }
 
-  Offset? _toField(Offset global) {
-    final box = context.findRenderObject() as RenderBox?;
-    if (box == null) return null;
-    final local     = box.globalToLocal(global);
-    final screenW   = box.size.width;
-    final screenH   = box.size.height;
-    final fieldOffX = (screenW - kFieldW) / 2;
-    final fieldOffY = (screenH - kFieldH) / 2 + 60;
-    return local - Offset(fieldOffX, fieldOffY);
+  String _resolveWinnerLabel(String winner) {
+    if (winner == 'draw') return '🤝 Ничья!';
+    final myId = widget.isHost ? 'p1' : 'p2';
+    return winner == myId ? 'Ты вышел из лабиринта!' : 'Соперник вышел первым!';
   }
 
-  void _showPop(String text, Color color) {
-    _scorePopText  = text;
-    _scorePopColor = color;
-    _showScorePop  = true;
-    _scorePopController.forward(from: 0);
-    if (mounted) setState(() {});
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted) setState(() => _showScorePop = false);
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // UI
-  // ═══════════════════════════════════════════════════════════════════════════
-
+  // ── build — больше НЕТ StreamBuilder, только setState ─────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D1A),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            ValueListenableBuilder<int>(
-              valueListenable: _hudRefresh,
-              builder: (_, __, ___) => _buildHeader(),
+            Column(
+              children: [
+                _buildGameHeader(),
+                const Spacer(),
+                if (_localPhase == _Phase.waiting)
+                  const _StatusChip(text: '⏳ Синхронизация игроков...')
+                else if (_localPhase == _Phase.countdown)
+                  _CountdownBig(value: _countdown)
+                else
+                  _MazeWidget(
+                      position: _ropePos,
+                      maxPos  : _kMaxPos,
+                      isHost  : widget.isHost),
+                const Spacer(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+                  child: Center(
+                    child: ScaleTransition(
+                      scale: _tapScale,
+                      child: GestureDetector(
+                        onTapDown: (_) => _onTap(),
+                        child: _BigTapButton(
+                            enabled: _localPhase == _Phase.playing,
+                            isHost : widget.isHost),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            Expanded(child: _buildField()),
-            _buildBottomBar(),
+            if (_localPhase == _Phase.gameOver)
+              Positioned.fill(
+                child: _OnlineGameOver(
+                  result: _resolveWinnerLabel(_winner),
+                  isWin : _winner == (widget.isHost ? 'p1' : 'p2'),
+                  onExit: () => Navigator.pop(context),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    final d         = _lastData;
-    final myScore   = _isHost ? (d['hostScore']  as int? ?? 0) : (d['guestScore'] as int? ?? 0);
-    final opScore   = _isHost ? (d['guestScore'] as int? ?? 0) : (d['hostScore']  as int? ?? 0);
-    final round     = d['round']     as int? ?? 0;
-    final maxRounds = d['maxRounds'] as int? ?? 5;
-
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+  Widget _buildGameHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: Color(0xFF8888AA), size: 20),
+                color: Color(0xFF8888AA)),
             onPressed: () => Navigator.pop(context),
           ),
-          GestureDetector(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: widget.roomCode));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Код скопирован!')),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF16213E),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                    color: const Color(0xFF00C896).withOpacity(0.4)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.meeting_room_outlined,
-                      color: Color(0xFF8888AA), size: 14),
-                  const SizedBox(width: 4),
-                  Text(
-                    widget.roomCode,
-                    style: const TextStyle(
-                      color: Color(0xFF00C896),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Spacer(),
-          Text('Раунд $round/$maxRounds',
-              style: const TextStyle(color: Color(0xFF8888AA), fontSize: 12)),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFF16213E),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                  color: const Color(0xFF00C896).withOpacity(0.2)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$myScore',
-                    style: const TextStyle(
-                        color: Color(0xFF00C896),
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900)),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(':',
-                      style: TextStyle(color: Color(0xFF8888AA), fontSize: 18)),
-                ),
-                Text('$opScore',
-                    style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildField() {
-    final effectiveKeeperX =
-    _phase == MatchPhase.keeperPhase ? _myKeeperTarget : _keeperX;
-
-    return GestureDetector(
-      onPanStart: _onDragStart,
-      onPanUpdate: _phase == MatchPhase.keeperPhase ? _onKeeperDrag : _onDragUpdate,
-      onPanEnd: _onDragEnd,
-      child: Center(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            RepaintBoundary(
-              child: SizedBox(
-                width: kFieldW,
-                height: kFieldH,
-                child: AnimatedBuilder(
-                  animation: _repaint,
-                  builder: (_, __) => CustomPaint(
-                    painter: _FieldPainter(
-                      ball            : _ball,
-                      ballScale       : _ballScale,
-                      ballVel         : _ballVel,
-                      ballSpin        : _ballSpin,
-                      keeperX         : effectiveKeeperX,
-                      keeperDive      : _phase == MatchPhase.shooting ||
-                          _phase == MatchPhase.calculating,
-                      keeperDiveAngle : effectiveKeeperX < kFieldW / 2 ? -0.4 : 0.4,
-                      dragStart       : _dragStart,
-                      dragCurrent     : _dragCurrent,
-                      showArrow       : _phase == MatchPhase.aiming,
-                      isKeeperPhase   : _phase == MatchPhase.keeperPhase,
-                      myAction        : _myAction,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            if (_phase == MatchPhase.waiting || _phase == MatchPhase.calculating)
-              _buildStatusOverlay(),
-
-            if (_showScorePop)
-              ScaleTransition(
-                scale: _scorePopAnim,
-                child: Text(
-                  _scorePopText,
-                  style: TextStyle(
-                    color: _scorePopColor,
-                    fontSize: 52,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 4,
-                    shadows: [
-                      Shadow(color: _scorePopColor.withOpacity(0.7), blurRadius: 30),
-                    ],
-                  ),
-                ),
-              ),
-
-            if (_phase == MatchPhase.result) _buildResultOverlay(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusOverlay() {
-    final d           = _lastData;
-    final guestJoined = d['guestJoined'] as bool? ?? false;
-    final isCalculating = _phase == MatchPhase.calculating;
-
-    return Container(
-      width: kFieldW,
-      height: kFieldH,
-      decoration: BoxDecoration(
-        color: isCalculating
-            ? Colors.black.withOpacity(0.5)
-            : Colors.black.withOpacity(0.70),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (!guestJoined) ...[
-            const Text('⏳', style: TextStyle(fontSize: 48)),
-            const SizedBox(height: 12),
-            const Text('Ожидание второго игрока',
+          Column(children: [
+            const Text('P1',
                 style: TextStyle(
-                    color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 20),
-            const Text('Код комнаты:',
-                style: TextStyle(color: Color(0xFF8888AA), fontSize: 13)),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () =>
-                  Clipboard.setData(ClipboardData(text: widget.roomCode)),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF16213E),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF00C896), width: 2),
-                ),
-                child: Text(
-                  widget.roomCode,
+                    color: Color(0xFFEF5B5B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold)),
+            Text('$_p1Taps',
+                style: const TextStyle(
+                    color: Color(0xFFEF5B5B),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold)),
+          ]),
+          Container(
+            padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+                color: const Color(0xFF16213E),
+                borderRadius: BorderRadius.circular(12)),
+            child: _localPhase == _Phase.playing
+                ? Row(children: [
+              const Icon(Icons.timer, color: Color(0xFFFFD700), size: 18),
+              const SizedBox(width: 6),
+              Text('$_timeLeft',
                   style: const TextStyle(
+                      color: Color(0xFFFFD700),
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2)),
+            ])
+                : Text(widget.roomId,
+                style: const TextStyle(
+                    color: Color(0xFF8888AA),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 3)),
+          ),
+          Column(children: [
+            const Text('P2',
+                style: TextStyle(
                     color: Color(0xFF00C896),
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 12,
-                  ),
-                ),
-              ),
-            ),
-          ] else if (isCalculating) ...[
-            const CircularProgressIndicator(color: Color(0xFF00C896)),
-            const SizedBox(height: 16),
-            Text(
-              _statusMessage ?? '',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ] else ...[
-            Text(
-              _statusMessage ?? '⏳',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-          ],
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold)),
+            Text('$_p2Taps',
+                style: const TextStyle(
+                    color: Color(0xFF00C896),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold)),
+          ]),
+          const SizedBox(width: 40),
         ],
       ),
     );
   }
-
-  Widget _buildResultOverlay() {
-    final d       = _lastData;
-    final myScore = _isHost ? (d['hostScore']  as int? ?? 0) : (d['guestScore'] as int? ?? 0);
-    final opScore = _isHost ? (d['guestScore'] as int? ?? 0) : (d['hostScore']  as int? ?? 0);
-    final opName  = _isHost
-        ? (d['guestName'] as String? ?? 'Соперник')
-        : (d['hostName']  as String? ?? 'Соперник');
-
-    final win   = myScore > opScore;
-    final draw  = myScore == opScore;
-    final title = draw ? '🤝 НИЧЬЯ!' : win ? '🏆 ПОБЕДА!' : '😔 ПОРАЖЕНИЕ';
-    final color = draw
-        ? const Color(0xFFFFD740)
-        : win ? const Color(0xFF00C896) : Colors.redAccent;
-
-    return Container(
-      width: kFieldW,
-      height: kFieldH,
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.82),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(title,
-              style: TextStyle(
-                  color: color,
-                  fontSize: 38,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 3,
-                  shadows: [
-                    Shadow(color: color.withOpacity(0.6), blurRadius: 24)
-                  ])),
-          const SizedBox(height: 10),
-          Text(
-            '${widget.playerName}  $myScore : $opScore  $opName',
-            style: const TextStyle(
-                color: Colors.white70, fontSize: 16, letterSpacing: 2),
-          ),
-          const SizedBox(height: 32),
-          _GlowButton(
-            label: 'СЫГРАТЬ СНОВА',
-            color: const Color(0xFF00C896),
-            onTap: _isHost ? _restartGame : () {},
-          ),
-          const SizedBox(height: 12),
-          _GlowButton(
-            label: 'В МЕНЮ',
-            color: const Color(0xFF16213E),
-            onTap: () => Navigator.pop(context),
-          ),
-          if (!_isHost) ...[
-            const SizedBox(height: 8),
-            const Text(
-              'Перезапустить может только хост',
-              style: TextStyle(color: Colors.white30, fontSize: 11),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Future<void> _restartGame() async {
-    if (!_isHost) return;
-    await _roomRef.update({
-      'hostScore'     : 0,
-      'guestScore'    : 0,
-      'round'         : 0,
-      'shooterRole'   : 'host',
-      'keeperTargetX' : null,
-      'keeperReady'   : false,
-      'shotVelX'      : null,
-      'shotVelY'      : null,
-      'shotSpin'      : null,
-      'shotFired'     : false,
-      'roundResult'   : null,
-      'roundComplete' : false,
-      'gameOver'      : false,
-    });
-    _resetLocalState();
-  }
-
-  Widget _buildBottomBar() {
-    if (_phase == MatchPhase.waiting     ||
-        _phase == MatchPhase.result      ||
-        _phase == MatchPhase.calculating ||
-        _phase == MatchPhase.shooting) {
-      return const SizedBox(height: 48);
-    }
-
-    if (_phase == MatchPhase.keeperPhase && !_keeperDecided) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '🧤 Перетащи вратаря в нужную позицию',
-              style: TextStyle(color: Color(0xFF8888AA), fontSize: 12),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: _GlowButton(
-                label: 'ЗАФИКСИРОВАТЬ ПОЗИЦИЮ',
-                color: const Color(0xFF00C896),
-                onTap: _confirmKeeperPosition,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_phase == MatchPhase.aiming) {
-      return const Padding(
-        padding: EdgeInsets.only(bottom: 12),
-        child: Text(
-          '👆 Тяни стрелку от мяча, чтобы ударить',
-          style: TextStyle(color: Color(0xFF8888AA), fontSize: 13, letterSpacing: 0.5),
-        ),
-      );
-    }
-
-    return const SizedBox(height: 48);
-  }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CustomPainter поля
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── Вспомогательные виджеты ───────────────────────────────────────────────────
 
-class _FieldPainter extends CustomPainter {
-  final Offset ball;
-  final double ballScale;
-  final Offset ballVel;
-  final double ballSpin;
-  final double keeperX;
-  final bool   keeperDive;
-  final double keeperDiveAngle;
-  final Offset? dragStart;
-  final Offset? dragCurrent;
-  final bool showArrow;
-  final bool isKeeperPhase;
-  final TurnAction myAction;
-
-  _FieldPainter({
-    required this.ball,
-    required this.ballScale,
-    required this.ballVel,
-    required this.ballSpin,
-    required this.keeperX,
-    required this.keeperDive,
-    required this.keeperDiveAngle,
-    this.dragStart,
-    this.dragCurrent,
-    required this.showArrow,
-    required this.isKeeperPhase,
-    required this.myAction,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    _drawField(canvas, size);
-    _drawGoal(canvas);
-    _drawKeeper(canvas);
-    _drawBall(canvas);
-    if (showArrow) _drawArrow(canvas);
-    if (isKeeperPhase && myAction == TurnAction.keep) _drawKeeperHint(canvas);
-    _drawShadows(canvas);
-  }
-
-  void _drawField(Canvas canvas, Size size) {
-    final fieldRect =
-    RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(20));
-    final grassPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0xFF1B5E20), Color(0xFF2E7D32), Color(0xFF1B5E20)],
-      ).createShader(Offset.zero & size);
-    canvas.drawRRect(fieldRect, grassPaint);
-
-    final stripePaint = Paint()
-      ..color = const Color(0xFF1A5C1E)
-      ..style = PaintingStyle.fill;
-    canvas.save();
-    canvas.clipRRect(fieldRect);
-    for (int i = 0; i < 8; i++) {
-      if (i % 2 == 0) {
-        canvas.drawRect(
-            Rect.fromLTWH(0, i * size.height / 8, size.width, size.height / 8),
-            stripePaint);
-      }
-    }
-
-    final linePaint = Paint()
-      ..color = Colors.white.withOpacity(0.25)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas.drawCircle(
-        Offset(size.width / 2, size.height * 0.65), 60, linePaint);
-    canvas.drawLine(Offset(0, size.height * 0.65),
-        Offset(size.width, size.height * 0.65), linePaint);
-
-    final penaltyRect = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height - 30),
-      width: 200, height: 140,
-    );
-    canvas.drawRect(penaltyRect, linePaint);
-    canvas.drawCircle(
-        Offset(size.width / 2, kBallStartY), 4, Paint()..color = Colors.white30);
-    canvas.restore();
-  }
-
-  void _drawGoal(Canvas canvas) {
-    final goalLeft = kFieldW / 2 - kGoalW / 2;
-    final netPaint = Paint()
-      ..color = Colors.white.withOpacity(0.12)
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-    for (double x = goalLeft; x <= goalLeft + kGoalW; x += 15) {
-      canvas.drawLine(Offset(x, kGoalY), Offset(x, kGoalY + kGoalH), netPaint);
-    }
-    for (double y = kGoalY; y <= kGoalY + kGoalH; y += 12) {
-      canvas.drawLine(Offset(goalLeft, y), Offset(goalLeft + kGoalW, y), netPaint);
-    }
-
-    final postPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(
-        Offset(goalLeft, kGoalY), Offset(goalLeft, kGoalY + kGoalH), postPaint);
-    canvas.drawLine(Offset(goalLeft + kGoalW, kGoalY),
-        Offset(goalLeft + kGoalW, kGoalY + kGoalH), postPaint);
-    canvas.drawLine(
-        Offset(goalLeft, kGoalY), Offset(goalLeft + kGoalW, kGoalY), postPaint);
-  }
-
-  void _drawKeeper(Canvas canvas) {
-    final kx = keeperX;
-    const ky = kKeeperY;
-
-    canvas.save();
-    canvas.translate(kx, ky);
-    if (keeperDive) canvas.rotate(keeperDiveAngle);
-
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(0, kKeeperH / 2 + 4), width: 40, height: 10),
-      Paint()..color = Colors.black.withOpacity(0.25),
-    );
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-          Rect.fromCenter(center: const Offset(0, 8), width: 32, height: 34),
-          const Radius.circular(6)),
-      Paint()..color = const Color(0xFFFFD600),
-    );
-    canvas.drawCircle(const Offset(-20, 6), 9, Paint()..color = const Color(0xFFFF6F00));
-    canvas.drawCircle(const Offset(20, 6),  9, Paint()..color = const Color(0xFFFF6F00));
-    canvas.drawCircle(const Offset(0, -16), 14, Paint()..color = const Color(0xFFFFCC80));
-
-    canvas.drawArc(
-      Rect.fromCenter(center: const Offset(0, -18), width: 28, height: 20),
-      pi, pi, false,
-      Paint()..color = const Color(0xFF5D4037),
-    );
-    canvas.drawCircle(const Offset(-5, -17), 2.5, Paint()..color = const Color(0xFF212121));
-    canvas.drawCircle(const Offset(5, -17),  2.5, Paint()..color = const Color(0xFF212121));
-
-    final legPaint = Paint()..color = const Color(0xFF1565C0);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(-14, 24, 12, 20), const Radius.circular(4)),
-        legPaint);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(2, 24, 12, 20), const Radius.circular(4)),
-        legPaint);
-
-    final bootPaint = Paint()..color = const Color(0xFF212121);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(-16, 40, 14, 8), const Radius.circular(3)),
-        bootPaint);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(1, 40, 14, 8), const Radius.circular(3)),
-        bootPaint);
-
-    canvas.restore();
-  }
-
-  void _drawKeeperHint(Canvas canvas) {
-    final goalLeft = kFieldW / 2 - kGoalW / 2;
-    canvas.drawRect(
-      Rect.fromLTWH(goalLeft, kGoalY, kGoalW, kGoalH),
-      Paint()
-        ..color = const Color(0xFF00C896).withOpacity(0.15)
-        ..style = PaintingStyle.fill,
-    );
-    final arrowPaint = Paint()
-      ..color = const Color(0xFF00C896).withOpacity(0.6)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(const Offset(kFieldW / 2 - 30, kKeeperY),
-        const Offset(kFieldW / 2 - 50, kKeeperY), arrowPaint);
-    canvas.drawLine(const Offset(kFieldW / 2 + 30, kKeeperY),
-        const Offset(kFieldW / 2 + 50, kKeeperY), arrowPaint);
-  }
-
-  void _drawBall(Canvas canvas) {
-    final bx    = ball.dx;
-    final by    = ball.dy;
-    final scale = ballScale.clamp(0.4, 1.2);
-    final r     = kBallR * scale;
-
-    canvas.save();
-    canvas.translate(bx, by);
-
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(0, r + 4), width: r * 2.2, height: r * 0.6),
-      Paint()..color = Colors.black.withOpacity(0.22 * scale),
-    );
-
-    canvas.drawCircle(
-      Offset.zero,
-      r,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-0.3, -0.4),
-          colors: [Colors.white, const Color(0xFFDDDDDD), const Color(0xFF888888)],
-        ).createShader(Rect.fromCircle(center: Offset.zero, radius: r)),
-    );
-
-    _drawBallPattern(canvas, r, Paint()..color = const Color(0xFF111111));
-
-    canvas.drawCircle(
-      Offset(-r * 0.3, -r * 0.35),
-      r * 0.25,
-      Paint()..color = Colors.white.withOpacity(0.55),
-    );
-
-    canvas.restore();
-  }
-
-  void _drawBallPattern(Canvas canvas, double r, Paint paint) {
-    final path = Path();
-    void hex(double cx, double cy, double size) {
-      for (int i = 0; i < 6; i++) {
-        final a  = pi / 3 * i - pi / 6;
-        final px = cx + cos(a) * size;
-        final py = cy + sin(a) * size;
-        i == 0 ? path.moveTo(px, py) : path.lineTo(px, py);
-      }
-      path.close();
-    }
-    hex(0, 0, r * 0.38);
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawArrow(Canvas canvas) {
-    if (dragStart == null || dragCurrent == null) return;
-    final from     = ball;
-    final rawDelta = dragStart! - dragCurrent!;
-    if (rawDelta.distance < 8) return;
-
-    final clampedLen = rawDelta.distance.clamp(0.0, kArrowMaxLen);
-    final dir   = rawDelta / rawDelta.distance;
-    final to    = from + dir * clampedLen;
-    final power = clampedLen / kArrowMaxLen;
-
-    final arrowColor =
-    Color.lerp(const Color(0xFF00C896), Colors.redAccent, power)!;
-
-    final arrowPaint = Paint()
-      ..color       = arrowColor.withOpacity(0.9)
-      ..strokeWidth = 3.5
-      ..strokeCap   = StrokeCap.round
-      ..style       = PaintingStyle.stroke;
-
-    const dashLen = 10.0;
-    const gapLen  = 5.0;
-    double d      = 0;
-    bool drawing  = true;
-    final total   = (to - from).distance;
-    Offset cur    = from;
-    while (d < total) {
-      if (drawing) {
-        final end = from + dir * (d + dashLen).clamp(0.0, total);
-        canvas.drawLine(cur, end, arrowPaint);
-        cur = end;
-        d += dashLen;
-      } else {
-        cur = from + dir * d;
-        d += gapLen;
-      }
-      drawing = !drawing;
-    }
-
-    const headLen   = 18.0;
-    const headAngle = pi / 5;
-    final angle     = atan2(dir.dy, dir.dx);
-    final tipPaint  = Paint()
-      ..color       = arrowColor
-      ..strokeWidth = 3.5
-      ..strokeCap   = StrokeCap.round
-      ..style       = PaintingStyle.stroke;
-
-    canvas.drawLine(to,
-        to - Offset(cos(angle - headAngle), sin(angle - headAngle)) * headLen, tipPaint);
-    canvas.drawLine(to,
-        to - Offset(cos(angle + headAngle), sin(angle + headAngle)) * headLen, tipPaint);
-    canvas.drawCircle(to, 5, Paint()..color = arrowColor);
-
-    canvas.drawArc(
-      Rect.fromCircle(center: from, radius: kBallR + 8),
-      -pi / 2, 2 * pi * power, false,
-      Paint()
-        ..color       = arrowColor.withOpacity(0.35)
-        ..strokeWidth = 3
-        ..style       = PaintingStyle.stroke,
-    );
-  }
-
-  void _drawShadows(Canvas canvas) {
-    canvas.drawRect(
-      Rect.fromLTWH(0, kFieldH - 60, kFieldW, 60),
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.transparent, Colors.black.withOpacity(0.25)],
-        ).createShader(Rect.fromLTWH(0, kFieldH - 60, kFieldW, 60)),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _FieldPainter old) =>
-      ball          != old.ball          ||
-          keeperX       != old.keeperX       ||
-          ballScale     != old.ballScale     ||
-          dragStart     != old.dragStart     ||
-          dragCurrent   != old.dragCurrent   ||
-          showArrow     != old.showArrow     ||
-          isKeeperPhase != old.isKeeperPhase;
-}
-
-// ─── Кнопка с свечением ───────────────────────────────────────────────────────
-
-class _GlowButton extends StatefulWidget {
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _GlowButton({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  State<_GlowButton> createState() => _GlowButtonState();
-}
-
-class _GlowButtonState extends State<_GlowButton> {
-  bool _pressed = false;
+class _CountdownBig extends StatelessWidget {
+  final int value;
+  const _CountdownBig({required this.value});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.94 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 14),
-          decoration: BoxDecoration(
-            color: widget.color,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: widget.color.withOpacity(0.4),
-                blurRadius: 20,
-                spreadRadius: 2,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2,
+    return Text(
+      '$value',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 96,
+        fontWeight: FontWeight.w900,
+        shadows: [Shadow(color: Color(0xFF00C896), blurRadius: 40)],
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String text;
+  const _StatusChip({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF16213E),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+            color: const Color(0xFF00C896).withOpacity(0.3)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+            color: Color(0xFF8888AA),
+            fontSize: 16,
+            fontWeight: FontWeight.w500),
+      ),
+    );
+  }
+}
+
+class _MazeWidget extends StatelessWidget {
+  final double position;
+  final int    maxPos;
+  final bool   isHost;
+
+  const _MazeWidget(
+      {required this.position, required this.maxPos, required this.isHost});
+
+  @override
+  Widget build(BuildContext context) {
+    final width    = MediaQuery.of(context).size.width;
+    final norm     = (position + maxPos) / (2 * maxPos);
+    final markerX  = norm * (width - 80) + 40;
+    final mySteps  = isHost
+        ? (position < 0 ? (-position).toInt() : 0)
+        : (position > 0 ? position.toInt()    : 0);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(children: [
+        Stack(clipBehavior: Clip.none, children: [
+          Container(
+            height: 28,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A2E),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: const Color(0xFF2A2A4A).withOpacity(0.5), width: 1),
             ),
           ),
+          FractionallySizedBox(
+            widthFactor: norm.clamp(0.0, 1.0),
+            heightFactor: 1.0,
+            alignment: Alignment.centerLeft,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: const LinearGradient(
+                    colors: [Color(0x3300C896), Color(0xFF00C896)]),
+              ),
+            ),
+          ),
+          Positioned(
+            left: (width - 64) / 2, top: 0, bottom: 0,
+            child: Container(width: 2, color: Colors.white.withOpacity(0.2)),
+          ),
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            left: markerX - 24, top: -10,
+            child: Container(
+              width: 48, height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF16213E),
+                border: Border.all(color: const Color(0xFF00C896), width: 3),
+                boxShadow: [
+                  BoxShadow(
+                      color: const Color(0xFF00C896).withOpacity(0.4),
+                      blurRadius: 15,
+                      spreadRadius: 1)
+                ],
+              ),
+              child: const Center(
+                  child: Text('🧩', style: TextStyle(fontSize: 22))),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('← P1',
+                style: TextStyle(
+                    color: const Color(0xFFEF5B5B).withOpacity(0.7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold)),
+            Text('P2 →',
+                style: TextStyle(
+                    color: const Color(0xFF00C896).withOpacity(0.7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold)),
+          ],
         ),
+        const SizedBox(height: 24),
+        Text(
+          position == 0
+              ? 'Нажимай — беги по лабиринту!'
+              : position < 0
+              ? 'P1 впереди на ${(-position).toInt()} шагов!'
+              : 'P2 впереди на ${position.toInt()} шагов!',
+          style: TextStyle(
+            color: position < 0
+                ? const Color(0xFFEF5B5B)
+                : position > 0
+                ? const Color(0xFF00C896)
+                : const Color(0xFF8888AA),
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Твои шаги: $mySteps / $maxPos',
+          style: const TextStyle(
+              color: Color(0xFF444466),
+              fontSize: 13,
+              fontWeight: FontWeight.w500),
+        ),
+      ]),
+    );
+  }
+}
+
+class _BigTapButton extends StatelessWidget {
+  final bool enabled, isHost;
+  const _BigTapButton({required this.enabled, required this.isHost});
+
+  @override
+  Widget build(BuildContext context) {
+    final color        = isHost ? const Color(0xFFEF5B5B) : const Color(0xFF00C896);
+    final currentColor = enabled ? color : const Color(0xFF16213E);
+
+    return Container(
+      width: 180, height: 180,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: currentColor,
+        border: Border.all(
+            color: enabled
+                ? currentColor.withOpacity(0.5)
+                : const Color(0xFF2A2A4A),
+            width: 4),
+        boxShadow: enabled
+            ? [
+          BoxShadow(
+              color: currentColor.withOpacity(0.45),
+              blurRadius: 30,
+              spreadRadius: 4)
+        ]
+            : [],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.directions_run_rounded,
+              color: enabled ? Colors.white : const Color(0xFF444466),
+              size: 52),
+          const SizedBox(height: 8),
+          Text(
+            enabled ? 'БЕГИ!' : 'Жди...',
+            style: TextStyle(
+                color: enabled ? Colors.white : const Color(0xFF444466),
+                fontWeight: FontWeight.w900,
+                fontSize: 20,
+                letterSpacing: 2),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OnlineGameOver extends StatelessWidget {
+  final String       result;
+  final bool         isWin;
+  final VoidCallback onExit;
+
+  const _OnlineGameOver(
+      {required this.result, required this.isWin, required this.onExit});
+
+  @override
+  Widget build(BuildContext context) {
+    final titleColor = result.contains('Ничья')
+        ? const Color(0xFFFFD700)
+        : isWin
+        ? const Color(0xFFFFD700)
+        : const Color(0xFFEF5B5B);
+    final title = result.contains('Ничья')
+        ? '🤝 НИЧЬЯ!'
+        : isWin
+        ? '🏆 ПОБЕДА!'
+        : '💀 ПОРАЖЕНИЕ';
+
+    return Container(
+      color: Colors.black.withOpacity(0.75),
+      child: Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: titleColor,
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 4,
+              shadows: [
+                Shadow(color: titleColor.withOpacity(0.6), blurRadius: 20)
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              result,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white.withOpacity(0.8)),
+            ),
+          ),
+          const SizedBox(height: 40),
+          GestureDetector(
+            onTap: onExit,
+            child: Container(
+              padding:
+              const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00C896),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                      color: const Color(0xFF00C896).withOpacity(0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6))
+                ],
+              ),
+              child: const Text(
+                'В МЕНЮ',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2),
+              ),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
+            ),
+          ),
+        ],
       ),
     );
   }
