@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'games/tank_room.dart';
 import 'games/ai_game.dart';
 import 'games/room_game.dart';
 
@@ -32,7 +34,6 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
   }
 
   void _navigate() {
-
     switch (widget.selectedGame) {
 
     /// 🟢 ТАНКИ
@@ -48,20 +49,25 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
           case 'random':
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => const RandomMatchmakingScreen()),
+              MaterialPageRoute(
+                  builder: (_) => const RandomMatchmakingScreen()),
             );
             break;
 
           case 'room':
             Navigator.pushReplacement(
               context,
+<<<<<<< HEAD
               MaterialPageRoute(builder: (_) => const TugOfWarRoomScreen()),
+=======
+              MaterialPageRoute(builder: (_) => const TankRoomScreen()),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
             );
             break;
         }
         break;
 
-    /// 🔵 МОРСКОЙ БОЙ (ТВОЙ КОД)
+    /// 🔵 МОРСКОЙ БОЙ
       case 'seabattle':
         switch (widget.selectedMode) {
           case 'ai':
@@ -75,7 +81,8 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
           case 'room':
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => const BattleshipRoomScreen()),
+              MaterialPageRoute(
+                  builder: (_) => const BattleshipRoomScreen()),
             );
             break;
         }
@@ -85,12 +92,6 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
       case 'tug':
         switch (widget.selectedMode) {
           case 'ai':
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const TugOfWarAIScreen()),
-            );
-            break;
-
           case 'random':
             Navigator.pushReplacement(
               context,
@@ -101,7 +102,8 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
           case 'room':
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => const TugOfWarRoomScreen()),
+              MaterialPageRoute(
+                  builder: (_) => const TugOfWarRoomScreen()),
             );
             break;
         }
@@ -112,21 +114,15 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
         switch (widget.selectedMode) {
           case 'ai':
           case 'random':
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const FootballGameScreen()),
-            );
-            break;
-
           case 'room':
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => const FootballGameScreen()),
+              MaterialPageRoute(
+                  builder: (_) => const FootballGameScreen()),
             );
             break;
         }
         break;
-
 
     /// 🚧 ОСТАЛЬНЫЕ ИГРЫ
       default:
@@ -139,8 +135,12 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('🚧 Скоро!', style: TextStyle(color: Colors.white, fontSize: 22)),
+        shape:
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          '🚧 Скоро!',
+          style: TextStyle(color: Colors.white, fontSize: 22),
+        ),
         content: const Text(
           'Эта игра находится в разработке.\nСкоро будет доступна!',
           style: TextStyle(color: Colors.white60, fontSize: 15),
@@ -148,10 +148,13 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // закрыть диалог
-              Navigator.pop(context); // вернуться в лобби
+              Navigator.pop(context);
+              Navigator.pop(context);
             },
-            child: const Text('Ок', style: TextStyle(color: Colors.tealAccent, fontSize: 16)),
+            child: const Text(
+              'Ок',
+              style: TextStyle(color: Colors.tealAccent, fontSize: 16),
+            ),
           ),
         ],
       ),
@@ -163,7 +166,8 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
     return const Scaffold(
       backgroundColor: Color(0xFF0F172A),
       body: Center(
-        child: CircularProgressIndicator(color: Colors.tealAccent),
+        child:
+        CircularProgressIndicator(color: Colors.tealAccent),
       ),
     );
   }
@@ -175,12 +179,14 @@ class RandomMatchmakingScreen extends StatefulWidget {
   const RandomMatchmakingScreen({super.key});
 
   @override
-  State<RandomMatchmakingScreen> createState() => _RandomMatchmakingScreenState();
+  State<RandomMatchmakingScreen> createState() =>
+      _RandomMatchmakingScreenState();
 }
 
 class _RandomMatchmakingScreenState extends State<RandomMatchmakingScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulse;
+  late StreamSubscription _dotsSub;
   int _dots = 0;
 
   @override
@@ -192,12 +198,11 @@ class _RandomMatchmakingScreenState extends State<RandomMatchmakingScreen>
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
 
-    // Анимация точек
-    Stream.periodic(const Duration(milliseconds: 500)).listen((_) {
-      if (mounted) setState(() => _dots = (_dots + 1) % 4);
-    });
+    _dotsSub =
+        Stream.periodic(const Duration(milliseconds: 500)).listen((_) {
+          if (mounted) setState(() => _dots = (_dots + 1) % 4);
+        });
 
-    // Через 3 сек — запуск игры против ИИ
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -210,6 +215,7 @@ class _RandomMatchmakingScreenState extends State<RandomMatchmakingScreen>
   @override
   void dispose() {
     _pulse.dispose();
+    _dotsSub.cancel();
     super.dispose();
   }
 
@@ -219,8 +225,12 @@ class _RandomMatchmakingScreenState extends State<RandomMatchmakingScreen>
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E293B),
-        leading: BackButton(color: Colors.white54),
-        title: const Text('Поиск соперника', style: TextStyle(color: Colors.white)),
+        leading: const BackButton(color: Colors.white54),
+        title: const Text(
+          'Поиск соперника',
+          style: TextStyle(color: Colors.white),
+        ),
+        elevation: 0,
       ),
       body: Center(
         child: Column(
@@ -231,17 +241,20 @@ class _RandomMatchmakingScreenState extends State<RandomMatchmakingScreen>
               builder: (_, __) => Transform.scale(
                 scale: 0.9 + _pulse.value * 0.15,
                 child: Container(
-                  width: 120, height: 120,
+                  width: 120,
+                  height: 120,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.green.withOpacity(0.15),
                     border: Border.all(
-                      color: Colors.green.withOpacity(0.4 + _pulse.value * 0.4),
+                      color: Colors.green
+                          .withOpacity(0.4 + _pulse.value * 0.4),
                       width: 3,
                     ),
                   ),
                   child: const Center(
-                    child: Text('🎲', style: TextStyle(fontSize: 56)),
+                    child: Text('🎲',
+                        style: TextStyle(fontSize: 56)),
                   ),
                 ),
               ),
@@ -249,14 +262,24 @@ class _RandomMatchmakingScreenState extends State<RandomMatchmakingScreen>
             const SizedBox(height: 36),
             Text(
               'Ищем соперника${'.' * _dots}',
-              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 12),
-            const Text('Скоро начнётся игра', style: TextStyle(color: Colors.white38, fontSize: 15)),
+            const Text(
+              'Скоро начнётся игра',
+              style: TextStyle(color: Colors.white38, fontSize: 15),
+            ),
             const SizedBox(height: 48),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена', style: TextStyle(color: Colors.white38, fontSize: 16)),
+              child: const Text(
+                'Отмена',
+                style: TextStyle(color: Colors.white38, fontSize: 16),
+              ),
             ),
           ],
         ),

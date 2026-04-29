@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'leaderboard_provider.dart';
 import 'leaderboard_tile.dart';
-
+//ст
 class LeaderboardScreen extends StatelessWidget {
+
   LeaderboardScreen({super.key});
 
   final LeaderboardProvider provider = LeaderboardProvider();
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = provider.currentUserId;
 
     return Scaffold(
+<<<<<<< HEAD
       backgroundColor: const Color(0xFF060B1A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D1B35),
@@ -82,12 +83,23 @@ class LeaderboardScreen extends StatelessWidget {
             ),
           ),
         ),
+=======
+
+      backgroundColor: const Color(0xff020617),
+
+      appBar: AppBar(
+        title: const Text("🌍 Global Ranking"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
       ),
 
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+
         stream: provider.getLeaderboard(),
         builder: (context, snapshot) {
 
+<<<<<<< HEAD
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
               child: Column(
@@ -117,10 +129,26 @@ class LeaderboardScreen extends StatelessWidget {
                     style: TextStyle(color: Colors.white38, fontSize: 13),
                   ),
                 ],
+=======
+          /// ⏳ Loading
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          /// ❌ Error
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                "Ошибка: ${snapshot.error}",
+                style: const TextStyle(color: Colors.white),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
               ),
             );
           }
 
+<<<<<<< HEAD
           if (snapshot.hasError) {
             return Center(
               child: Column(
@@ -173,6 +201,14 @@ class LeaderboardScreen extends StatelessWidget {
                     style: TextStyle(color: Colors.white38, fontSize: 13),
                   ),
                 ],
+=======
+          /// 📭 Empty
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text(
+                "Нет игроков 😢",
+                style: TextStyle(color: Colors.white),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
               ),
             );
           }
@@ -180,6 +216,7 @@ class LeaderboardScreen extends StatelessWidget {
           final players = snapshot.data!.docs;
 
           return ListView.builder(
+<<<<<<< HEAD
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             itemCount: players.length,
             itemBuilder: (context, index) {
@@ -191,6 +228,102 @@ class LeaderboardScreen extends StatelessWidget {
                 data: data,
                 index: index,
                 isCurrentUser: isMe,
+=======
+
+            padding: const EdgeInsets.all(12),
+
+            itemCount: players.length,
+
+            itemBuilder: (context, index) {
+
+              final player = players[index].data();
+
+              final name = player['name'] ?? 'Player';
+              final rating = player['rating'] ?? 0;
+
+              /// 🎨 Цвет топа
+              Color color;
+              if (index == 0) color = Colors.amber;
+              else if (index == 1) color = Colors.grey;
+              else if (index == 2) color = Colors.deepOrange;
+              else color = Colors.blueGrey;
+
+              /// 👤 инициалы
+              String initials = "";
+              final parts = name.toString().split(" ");
+              for (var p in parts) {
+                if (p.isNotEmpty) initials += p[0];
+              }
+
+              return Container(
+
+                margin: const EdgeInsets.only(bottom: 12),
+
+                padding: const EdgeInsets.all(12),
+
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: color.withOpacity(0.5)),
+                ),
+
+                child: Row(
+                  children: [
+
+                    /// 🏆 МЕСТО
+                    Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        "${index + 1}",
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    /// 👤 АВАТАР
+                    CircleAvatar(
+                      backgroundColor: Colors.blueAccent,
+                      child: Text(
+                        initials.toUpperCase(),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    /// 🧑 ИМЯ
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+
+                    /// 💰 ОЧКИ
+                    Text(
+                      "$rating",
+                      style: const TextStyle(
+                        color: Colors.amber,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
               );
             },
           );

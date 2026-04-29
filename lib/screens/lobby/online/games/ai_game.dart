@@ -1,6 +1,6 @@
 // lobby/online/games/ai_game.dart
 // Игра в танки против ИИ с лабиринтом
-
+import 'tank_room.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';

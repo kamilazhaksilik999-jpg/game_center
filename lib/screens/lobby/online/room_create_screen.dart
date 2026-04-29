@@ -14,6 +14,10 @@ class RoomCreateScreen extends StatefulWidget {
 class _RoomCreateScreenState extends State<RoomCreateScreen> {
   late String roomCode;
   bool isCreated = false;
+<<<<<<< HEAD
+=======
+  bool opponentJoined = false;
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
 
   @override
   void initState() {
@@ -26,6 +30,7 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
       Iterable.generate(
         6,
             (_) => '0123456789'.codeUnitAt(Random().nextInt(10)),
+<<<<<<< HEAD
       ),
     );
   }
@@ -63,13 +68,33 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
           side: const BorderSide(color: Color(0xFF34D399), width: 1),
         ),
         duration: const Duration(seconds: 2),
+=======
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
       ),
     );
+  }
+
+  Future<void> createRoom() async {
+    await FirebaseFirestore.instance
+        .collection('rooms')
+        .doc(roomCode)
+        .set({
+      'game': widget.gameName,
+      'player1': 'player1',
+      'player2': null,
+      'status': 'waiting',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    setState(() {
+      isCreated = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+<<<<<<< HEAD
       backgroundColor: const Color(0xFF060B1A),
 
       // ─── AppBar видимый ────────────────────────────────────────────
@@ -93,12 +118,28 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
           children: [
             const Icon(Icons.meeting_room_rounded, color: Color(0xFFD97706), size: 20),
             const SizedBox(width: 8),
+=======
+      appBar: AppBar(title: Text("Комната: ${widget.gameName}")),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text("Код комнаты:", style: TextStyle(fontSize: 18)),
+            const SizedBox(height: 10),
+
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
             Text(
               widget.gameName,
               style: const TextStyle(
+<<<<<<< HEAD
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
+=======
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 6,
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
               ),
             ),
           ],
@@ -123,6 +164,7 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
           child: Column(
             children: [
 
+<<<<<<< HEAD
               const SizedBox(height: 20),
 
               // ── Блок с кодом ──────────────────────────────────────────
@@ -463,6 +505,91 @@ class _RoomCreateScreenState extends State<RoomCreateScreen> {
                 letterSpacing: 0.5,
               ),
             ),
+=======
+            if (!isCreated)
+              ElevatedButton(
+                onPressed: createRoom,
+                child: const Text("Создать комнату"),
+              ),
+
+            if (isCreated) ...[
+              const SizedBox(height: 20),
+
+              // Слушаем Firestore — ждём пока player2 войдёт
+              StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('rooms')
+                    .doc(roomCode)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const CircularProgressIndicator();
+                  }
+
+                  final data =
+                  snapshot.data!.data() as Map<String, dynamic>?;
+
+                  final player2 = data?['player2'];
+
+                  if (player2 != null) {
+                    // Игрок зашёл — можно начинать
+                    return Column(
+                      children: [
+                        const Icon(Icons.check_circle,
+                            color: Colors.green, size: 48),
+                        const SizedBox(height: 10),
+                        const Text(
+                          "Противник подключился!",
+                          style: TextStyle(
+                              fontSize: 18, color: Colors.green),
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () {
+                            // TODO: переход к игре
+                          },
+                          child: const Text("Начать игру"),
+                        ),
+                      ],
+                    );
+                  }
+
+                  // Ожидание с таймером
+                  return Column(
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Ожидание противника...",
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Поделитесь кодом с другом",
+                        style:
+                        TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 20),
+                      TextButton(
+                        onPressed: () async {
+                          // Удаляем комнату если отменили
+                          await FirebaseFirestore.instance
+                              .collection('rooms')
+                              .doc(roomCode)
+                              .delete();
+                          if (context.mounted) Navigator.pop(context);
+                        },
+                        child: const Text(
+                          "Отменить",
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+>>>>>>> 618ce7ee981c0d20f2ff4661020287d78909d761
           ],
         ),
       ),
