@@ -1,18 +1,10 @@
 // lobby/online/games/tank_room.dart
-// Танки онлайн — 2 реальных игрока через Firestore
-//
-// Антилаг:
-//   • Физика локально 60 fps — управление мгновенное
-//   • Dead reckoning: соперник движется по инерции между обновлениями
-//   • Плавная интерполяция позиции соперника (lerp)
-//   • Синхронизация 20/сек (достаточно при dead reckoning)
-//   • Пули движутся локально у обоих — нет "прыжков"
-
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../../features/leaderboard/leaderboard_provider.dart'; // ← НОВОЕ
 
 // ─── Константы ───────────────────────────────────────────────────────────────
 
@@ -23,10 +15,8 @@ const double kTTank   = 28.0;
 const double kTBullet = 7.0;
 const double kTMove   = 2.5;
 const double kTBSpeed = 5.0;
-const int    kTSyncMs = 50;   // публикуем 20 раз/сек
+const int    kTSyncMs = 50;
 
-// Насколько быстро интерполируем позицию соперника (0..1 за тик)
-// 0.3 = плавно догоняем, 1.0 = мгновенно
 const double kLerp = 0.3;
 
 // ─── Направления ─────────────────────────────────────────────────────────────
@@ -451,6 +441,9 @@ class TankOnlineGame extends StatefulWidget {
 
 class _TankOnlineGameState extends State<TankOnlineGame> {
 
+  // ← НОВОЕ
+  final _leaderboard = LeaderboardProvider();
+
   // ── Лабиринт ────────────────────────────────────────────────────────────────
   List<List<bool>> _walls = [];
   bool _ready = false;
@@ -463,13 +456,12 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
   bool _myMoving    = false;
   final List<TBullet> _myBullets = [];
 
-  // ── Соперник — "авторитетное" значение из Firestore ─────────────────────────
-  late Offset _oppPosRemote;   // последнее что пришло из сети
+  // ── Соперник ─────────────────────────────────────────────────────────────────
+  late Offset _oppPosRemote;
   TDir        _oppDirRemote  = TDir.left;
   bool        _oppMoving     = false;
 
-  // ── Соперник — локальная отрисовка (интерполируется + dead reckoning) ───────
-  late Offset _oppPosLocal;    // то что рисуем на экране
+  late Offset _oppPosLocal;
   TDir        _oppDirLocal   = TDir.left;
   int         _oppHp         = 3;
   int         _oppScore      = 0;
@@ -492,7 +484,14 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
   String get _myPfx  => widget.isHost ? 'p1' : 'p2';
   String get _oppPfx => widget.isHost ? 'p2' : 'p1';
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ← НОВОЕ: сохранение результата в рейтинг
+  Future<void> _onGameFinished(bool win) async {
+    final userId = _leaderboard.currentUserId;
+    if (userId != null) {
+      await _leaderboard.updateAfterMatch(userId: userId, win: win);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -526,17 +525,14 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
   }
 
   void _startTimers() {
-    // Физика 60 fps
     _physTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
       if (!_gameOver && _ready) _physTick();
     });
-    // Публикация 20/сек
     _syncTimer = Timer.periodic(Duration(milliseconds: kTSyncMs), (_) {
       if (!_gameOver && _ready) _publishMyState();
     });
   }
 
-  // ─── Публикация ─────────────────────────────────────────────────────────────
   void _publishMyState() {
     FirebaseFirestore.instance
         .collection('tank_pvp_rooms')
@@ -552,7 +548,6 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
     });
   }
 
-  // ─── Слушаем соперника ──────────────────────────────────────────────────────
   void _listenRoom() {
     _sub = FirebaseFirestore.instance
         .collection('tank_pvp_rooms')
@@ -562,7 +557,6 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
       if (!snap.exists || _gameOver) return;
       final d = snap.data()!;
 
-      // Обновляем авторитетную позицию соперника
       final ox = (d['${_oppPfx}_x'] as num?)?.toDouble() ?? _oppPosRemote.dx;
       final oy = (d['${_oppPfx}_y'] as num?)?.toDouble() ?? _oppPosRemote.dy;
       _oppPosRemote  = Offset(ox, oy);
@@ -581,7 +575,6 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
       final status = d['status'] as String? ?? 'playing';
       final winner = d['winner'] as String? ?? '';
 
-      // НЕ вызываем setState здесь — всё применится в следующем physTick
       _oppHp    = oh;
       _oppScore = os;
       _oppBullets
@@ -590,30 +583,29 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
       _oppDirLocal = _oppDirRemote;
 
       if (status == 'done' && !_gameOver) {
+        final iWon = winner == _myPfx;
         setState(() {
           _gameOver = true;
-          _iWon     = winner == _myPfx;
+          _iWon     = iWon;
         });
+        _onGameFinished(iWon); // ← НОВОЕ
       }
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Физика — 60 fps
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── Физика ──────────────────────────────────────────────────────────────────
 
   void _physTick() {
     setState(() {
       _handleMove();
       _handleShoot();
-      _applyDeadReckoning();   // двигаем соперника по инерции
-      _smoothOppPosition();    // плавно тянемся к авторитетной позиции
+      _applyDeadReckoning();
+      _smoothOppPosition();
       _moveBullets();
       _checkHits();
     });
   }
 
-  // ── Моё движение ────────────────────────────────────────────────────────────
   void _handleMove() {
     TDir? dir;
     if (_keys.contains(LogicalKeyboardKey.arrowUp)    || _keys.contains(LogicalKeyboardKey.keyW)) dir = TDir.up;
@@ -655,25 +647,17 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
     return true;
   }
 
-  // ── Dead reckoning: двигаем соперника по инерции ─────────────────────────────
-  // Если соперник двигался — продолжаем двигать локально в том же направлении
-  // пока не придёт новое обновление. Это убирает "стоп-старт" эффект.
   void _applyDeadReckoning() {
     if (!_oppMoving) return;
     final next = _oppPosLocal + tDirOff(_oppDirLocal) * (kTMove / kTCell);
     if (_canMove(next)) _oppPosLocal = next;
   }
 
-  // ── Плавная интерполяция к авторитетной позиции ───────────────────────────
-  // Lerp тянет локальную позицию к тому что пришло из сети.
-  // Если ошибка > 1.5 клетки — мгновенно корректируем (телепорт незаметен).
   void _smoothOppPosition() {
     final diff = _oppPosRemote - _oppPosLocal;
     if (diff.distance > 1.5) {
-      // Большая ошибка — сразу корректируем
       _oppPosLocal = _oppPosRemote;
     } else {
-      // Плавно тянемся
       _oppPosLocal = Offset(
         _oppPosLocal.dx + diff.dx * kLerp,
         _oppPosLocal.dy + diff.dy * kLerp,
@@ -681,7 +665,6 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
     }
   }
 
-  // ── Выстрел ─────────────────────────────────────────────────────────────────
   void _handleShoot() {
     if (_shootTapped || _keys.contains(LogicalKeyboardKey.space)) {
       _shootTapped = false;
@@ -691,7 +674,6 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
     }
   }
 
-  // ── Движение пуль ───────────────────────────────────────────────────────────
   void _moveBullets() {
     void move(List<TBullet> list) {
       list.removeWhere((b) {
@@ -706,7 +688,6 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
     move(_oppBullets);
   }
 
-  // ── Проверка попаданий ──────────────────────────────────────────────────────
   void _checkHits() {
     _myBullets.removeWhere((b) {
       if ((b.pos - _oppPosLocal).distance < 0.6) {
@@ -740,6 +721,7 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
       '${_myPfx}_score': _myScore,
       '${_myPfx}_hp'   : _myHp,
     });
+    _onGameFinished(iWon); // ← НОВОЕ
   }
 
   @override
@@ -750,9 +732,7 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
     super.dispose();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // UI
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── UI ──────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -851,7 +831,7 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
               myPos      : _myPos,
               myDir      : _myDir,
               myColor    : widget.isHost ? const Color(0xFF00C896) : const Color(0xFFEF5B5B),
-              oppPos     : _oppPosLocal,   // рисуем интерполированную позицию
+              oppPos     : _oppPosLocal,
               oppDir     : _oppDirLocal,
               oppColor   : widget.isHost ? const Color(0xFFEF5B5B) : const Color(0xFF00C896),
               myBullets  : _myBullets,
@@ -884,7 +864,39 @@ class _TankOnlineGameState extends State<TankOnlineGame> {
             _iWon ? 'Соперник уничтожен!' : 'Твой танк уничтожен!',
             style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16),
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 20),
+          // ← НОВОЕ: отображение изменения рейтинга
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: _iWon
+                  ? const Color(0xFFFFD700).withOpacity(0.15)
+                  : const Color(0xFFEF5B5B).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _iWon
+                    ? const Color(0xFFFFD700).withOpacity(0.4)
+                    : const Color(0xFFEF5B5B).withOpacity(0.4),
+              ),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(
+                _iWon ? Icons.trending_up : Icons.trending_down,
+                color: _iWon ? Colors.greenAccent : Colors.redAccent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _iWon ? '+30 рейтинга' : '-5 рейтинга',
+                style: TextStyle(
+                  color: _iWon ? Colors.greenAccent : Colors.redAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 24),
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
