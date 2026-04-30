@@ -10,11 +10,12 @@ import 'games/battleship_room.dart';
 import 'games/tug_of_war_ai.dart';
 import 'games/tug_of_war_room.dart';
 
-import 'games/mini_football_screen.dart';
+import 'games/pong_ai_game.dart';
+import 'games/pong_room.dart';
 
 class OnlineGamesScreen extends StatefulWidget {
-  final String selectedGame; // "tank" | "football" | "tug" | "seabattle"
-  final String selectedMode; // "ai"   | "random"   | "room"
+  final String selectedGame;
+  final String selectedMode;
 
   const OnlineGamesScreen({
     super.key,
@@ -102,15 +103,21 @@ class _OnlineGamesScreenState extends State<OnlineGamesScreen> {
         }
         break;
 
-    /// ⚽ ФУТБОЛ
+    /// 🏓 ПОНГ (бывший футбол)
       case 'football':
         switch (widget.selectedMode) {
           case 'ai':
           case 'random':
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const PongAIGameScreen()),
+            );
+            break;
+
           case 'room':
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => const FootballGameScreen()),
+              MaterialPageRoute(builder: (_) => const PongRoomScreen()),
             );
             break;
         }
