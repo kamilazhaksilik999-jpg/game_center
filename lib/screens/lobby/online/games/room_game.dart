@@ -1,6 +1,7 @@
 // lobby/online/games/room_game.dart
 
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -21,17 +22,19 @@ class _RoomGameScreenState extends State<RoomGameScreen> {
   final _ctrl = TextEditingController();
   String? _error;
   bool _loading = false;
-  // ignore: unused_field
-  final _rng = Object(); // kept for seed generation if needed
+  final _rng = Random();
 
   String _generateCode() {
-    final rng = DateTime.now().millisecondsSinceEpoch;
-    return (rng % 900000 + 100000).toString();
+    final rng = Random();
+    return List.generate(6, (_) => rng.nextInt(10).toString()).join();
   }
+
+  int _generateSeed() => _rng.nextInt(999999);
 
   Future<void> _createRoom() async {
     setState(() { _loading = true; _error = null; });
     final code = _generateCode();
+    final seed = _generateSeed();
 
     await FirebaseFirestore.instance.collection('tank_rooms').doc(code).set({
       'rope_pos'   : 0,
@@ -147,8 +150,8 @@ class _RoomGameScreenState extends State<RoomGameScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
+
               Row(children: [
                 const Expanded(child: Divider(color: Color(0xFF2A2A4A))),
                 Padding(
@@ -416,16 +419,15 @@ enum _Phase { waiting, countdown, playing, gameOver }
 class _RoomOnlineGameState extends State<RoomOnlineGame>
     with SingleTickerProviderStateMixin {
 
-  // ── Состояние ──────────────────────────────────────────────────────────────
   _Phase _localPhase = _Phase.waiting;
   bool   _finished   = false;
 
-  double _ropePos   = 0;
-  int    _p1Taps    = 0;
-  int    _p2Taps    = 0;
+  double _ropePos  = 0;
+  int    _p1Taps   = 0;
+  int    _p2Taps   = 0;
   int    _countdown = 3;
   int    _timeLeft  = _kGameSec;
-  String _winner    = '';
+  String _winner   = '';
 
   Timer?              _countdownTimer;
   Timer?              _gameTimer;
@@ -436,7 +438,6 @@ class _RoomOnlineGameState extends State<RoomOnlineGame>
 
   String get _myTapsField => widget.isHost ? 'p1_taps' : 'p2_taps';
 
-  // ── initState ──────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -456,7 +457,6 @@ class _RoomOnlineGameState extends State<RoomOnlineGame>
     });
   }
 
-  // ── dispose ────────────────────────────────────────────────────────────────
   @override
   void dispose() {
     _countdownTimer?.cancel();
@@ -466,7 +466,6 @@ class _RoomOnlineGameState extends State<RoomOnlineGame>
     super.dispose();
   }
 
-  // ── Обработка снапшота ─────────────────────────────────────────────────────
   void _handleSnapshot(Map<String, dynamic> d) {
     final status  = d['status']   as String? ?? 'waiting';
     final p1Ready = d['p1_ready'] as bool?   ?? false;
@@ -502,7 +501,6 @@ class _RoomOnlineGameState extends State<RoomOnlineGame>
     }
   }
 
-  // ── Таймеры ────────────────────────────────────────────────────────────────
   void _startCountdown() {
     _countdown = 3;
     _countdownTimer?.cancel();
@@ -552,7 +550,6 @@ class _RoomOnlineGameState extends State<RoomOnlineGame>
     });
   }
 
-  // ── Нажатие кнопки ────────────────────────────────────────────────────────
   void _onTap() {
     if (_localPhase != _Phase.playing) return;
     _tapCtrl.forward(from: 0).then((_) => _tapCtrl.reverse());
@@ -595,7 +592,6 @@ class _RoomOnlineGameState extends State<RoomOnlineGame>
     return winner == myId ? 'Ты вышел из лабиринта!' : 'Соперник вышел первым!';
   }
 
-  // ── build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -768,10 +764,10 @@ class _MazeWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width   = MediaQuery.of(context).size.width;
-    final norm    = (position + maxPos) / (2 * maxPos);
-    final markerX = norm * (width - 80) + 40;
-    final mySteps = isHost
+    final width    = MediaQuery.of(context).size.width;
+    final norm     = (position + maxPos) / (2 * maxPos);
+    final markerX  = norm * (width - 80) + 40;
+    final mySteps  = isHost
         ? (position < 0 ? (-position).toInt() : 0)
         : (position > 0 ? position.toInt()    : 0);
 
