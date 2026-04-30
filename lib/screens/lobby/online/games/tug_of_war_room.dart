@@ -1362,4 +1362,3 @@ class _BgPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _BgPainter old) => old.t != t;
 }
-//
