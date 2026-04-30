@@ -179,7 +179,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       default:
         screen = TankOnlineGame(
           roomId: roomCode,
-          isHost: false,
+          isHost: true,
         );
     }
     Navigator.push(
