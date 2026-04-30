@@ -8,6 +8,15 @@ import '../friends/friends_screen.dart';
 import '../friends/user_profile_screen.dart';
 import '../chat/chat_screen.dart';
 
+// ─── Цвета темы ───────────────────────────────────────────────────────────────
+const _kBg        = Color(0xFF0D0D1A);
+const _kCard      = Color(0xFF16213E);
+const _kCardDark  = Color(0xFF0F1829);
+const _kAccent    = Color(0xFF00C896);
+const _kAccentRed = Color(0xFFEF5B5B);
+const _kTextMuted = Color(0xFF8888AA);
+const _kBorder    = Color(0xFF2A2A4A);
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -103,9 +112,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF16213E),
+        backgroundColor: _kCard,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: _kAccent, width: 1)),
         title: const Text('Изменить имя',
-            style: TextStyle(color: Colors.white)),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: _nameController,
           style: const TextStyle(color: Colors.white),
@@ -113,22 +125,31 @@ class _ProfileScreenState extends State<ProfileScreen>
           autofocus: true,
           decoration: InputDecoration(
             hintText: 'Новое имя',
-            hintStyle: const TextStyle(color: Colors.white38),
-            counterStyle: const TextStyle(color: Colors.white38),
+            hintStyle: const TextStyle(color: _kTextMuted),
+            counterStyle: const TextStyle(color: _kTextMuted),
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.1),
+            fillColor: _kCardDark,
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _kAccent, width: 1)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                const BorderSide(color: _kBorder, width: 1)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                const BorderSide(color: _kAccent, width: 1.5)),
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            onPressed: () async {
+              child: const Text('Отмена',
+                  style: TextStyle(color: _kTextMuted))),
+          _NeonButton(
+            label: 'Сохранить',
+            onTap: () async {
               final newName = _nameController.text.trim();
               if (newName.isEmpty) return;
               setState(() => _userData!['name'] = newName);
@@ -141,7 +162,6 @@ class _ProfileScreenState extends State<ProfileScreen>
               }
               _showSnack('Имя сохранено ✅');
             },
-            child: const Text('Сохранить'),
           ),
         ],
       ),
@@ -151,25 +171,34 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _changeAvatar() async {
     await showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF16213E),
+      backgroundColor: _kCard,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: _kBorder,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             const Text('Выбери аватар',
                 style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Wrap(
               spacing: 10,
               runSpacing: 10,
               alignment: WrapAlignment.center,
               children: _avatars.map((emoji) {
+                final isSelected = _userData?['avatar'] == emoji;
                 return GestureDetector(
                   onTap: () async {
                     setState(() => _userData!['avatar'] = emoji);
@@ -186,11 +215,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                     width: 52, height: 52,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: isSelected
+                          ? _kAccent.withOpacity(0.2)
+                          : _kCardDark,
+                      border: Border.all(
+                          color: isSelected ? _kAccent : _kBorder,
+                          width: isSelected ? 2 : 1),
                     ),
                     child: Center(
                         child: Text(emoji,
-                            style: const TextStyle(fontSize: 28))),
+                            style: const TextStyle(fontSize: 26))),
                   ),
                 );
               }).toList(),
@@ -219,19 +253,23 @@ class _ProfileScreenState extends State<ProfileScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF16213E),
+        backgroundColor: _kCard,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: _kAccent, width: 1)),
         title: Text('Повысить до $nextRank?',
-            style: const TextStyle(color: Colors.white)),
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold)),
         content: Text('Спишется $cost 🪙\nОстаток: ${coins - cost} 🪙',
-            style: const TextStyle(color: Colors.white70)),
+            style: const TextStyle(color: _kTextMuted)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Отмена')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Купить'),
+              child: const Text('Отмена',
+                  style: TextStyle(color: _kTextMuted))),
+          _NeonButton(
+            label: 'Купить',
+            onTap: () => Navigator.pop(context, true),
           ),
         ],
       ),
@@ -257,10 +295,12 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: const Color(0xFF16213E),
+      content: Text(msg, style: const TextStyle(color: Colors.white)),
+      backgroundColor: _kCard,
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: _kAccent, width: 1)),
     ));
   }
 
@@ -268,13 +308,13 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Color(0xFF1A1A2E),
-        body: Center(child: CircularProgressIndicator(color: Colors.orange)),
+        backgroundColor: _kBg,
+        body: Center(child: CircularProgressIndicator(color: _kAccent)),
       );
     }
     if (_userData == null) {
       return const Scaffold(
-        backgroundColor: Color(0xFF1A1A2E),
+        backgroundColor: _kBg,
         body: Center(
             child: Text('Ошибка загрузки профиля',
                 style: TextStyle(color: Colors.white))),
@@ -285,68 +325,98 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildProfileScreen() {
     final data = _userData!;
-    final String name = data['name'] ?? 'Player';
-    final String id = data['id'] ?? '#0000';
-    final int coins = data['coins'] ?? 0;
-    final int wins = data['wins'] ?? 0;
-    final int games = data['gamesPlayed'] ?? 0;
-    final String rank = data['rank'] ?? 'Новичок';
-    final String avatar = data['avatar'] ?? '😊';
+    final String name   = data['name']        ?? 'Player';
+    final String id     = data['id']          ?? '#0000';
+    final int coins     = data['coins']       ?? 0;
+    final int wins      = data['wins']        ?? 0;
+    final int games     = data['gamesPlayed'] ?? 0;
+    final String rank   = data['rank']        ?? 'Новичок';
+    final String avatar = data['avatar']      ?? '😊';
 
     final rankIdx = _rankOrder.indexOf(rank);
-    final isMax = rankIdx >= _rankOrder.length - 1;
+    final isMax   = rankIdx >= _rankOrder.length - 1;
     final nextRank = isMax ? null : _rankOrder[rankIdx + 1];
-    final cost = isMax ? null : _rankCost[rank];
+    final cost    = isMax ? null : _rankCost[rank];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: _kBg,
       body: NestedScrollView(
         headerSliverBuilder: (context, _) => [
           SliverToBoxAdapter(
             child: Column(
               children: [
-                // ── Шапка ──
+                // ── Шапка ──────────────────────────────────────────────────
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.only(top: 60, bottom: 20),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF833AB4), Color(0xFFE1306C), Color(0xFFFD1D1D)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                  padding: const EdgeInsets.only(top: 56, bottom: 24),
+                  decoration: BoxDecoration(
+                    color: _kCardDark,
+                    border: const Border(
+                        bottom: BorderSide(color: _kBorder, width: 1)),
+                    boxShadow: [
+                      BoxShadow(
+                          color: _kAccent.withOpacity(0.06),
+                          blurRadius: 40,
+                          offset: const Offset(0, 8)),
+                    ],
                   ),
                   child: Column(
                     children: [
+                      // Кнопка назад
+                      Align(
+                        alignment: Alignment.topLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8, bottom: 12),
+                          child: IconButton(
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                                color: _kTextMuted, size: 20),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ),
+
+                      // Аватар
                       GestureDetector(
                         onTap: _changeAvatar,
                         child: Stack(
                           children: [
                             Container(
-                              width: 90, height: 90,
+                              width: 88, height: 88,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: Colors.orange.shade300,
+                                color: _kCard,
+                                border: Border.all(
+                                    color: _kAccent, width: 2.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: _kAccent.withOpacity(0.25),
+                                      blurRadius: 20,
+                                      spreadRadius: 2),
+                                ],
                               ),
                               child: Center(
                                   child: Text(avatar,
-                                      style: const TextStyle(fontSize: 46))),
+                                      style: const TextStyle(fontSize: 44))),
                             ),
                             Positioned(
                               right: 0, bottom: 0,
                               child: Container(
                                 width: 26, height: 26,
-                                decoration: const BoxDecoration(
+                                decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Colors.orange),
+                                    color: _kAccent,
+                                    border: Border.all(
+                                        color: _kBg, width: 2)),
                                 child: const Icon(Icons.edit,
-                                    size: 14, color: Colors.white),
+                                    size: 13, color: Colors.white),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
+
+                      // Имя
                       GestureDetector(
                         onTap: _editName,
                         child: Row(
@@ -356,53 +426,59 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 22,
-                                    fontWeight: FontWeight.bold)),
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5)),
                             const SizedBox(width: 6),
                             const Icon(Icons.edit,
-                                size: 14, color: Colors.white60),
+                                size: 14, color: _kTextMuted),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 4),
                       Text('ID: $id',
                           style: const TextStyle(
-                              color: Colors.white60, fontSize: 13)),
-                      const SizedBox(height: 10),
+                              color: _kTextMuted, fontSize: 13)),
+                      const SizedBox(height: 12),
                       _rankBadge(rank),
                     ],
                   ),
                 ),
 
-                // ── Статистика ──
+                // ── Статистика ─────────────────────────────────────────────
                 Container(
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding: const EdgeInsets.symmetric(vertical: 18),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF16213E),
+                    color: _kCard,
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _kBorder, width: 1),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _stat('$coins', 'монет', Colors.yellow),
+                      _stat('$coins', 'монет', const Color(0xFFFFD700)),
                       _divider(),
-                      _stat('$wins', 'побед', Colors.greenAccent),
+                      _stat('$wins', 'побед', _kAccent),
                       _divider(),
-                      _stat('$games', 'игр', Colors.lightBlueAccent),
+                      _stat('$games', 'игр', const Color(0xFF5B8DEF)),
                     ],
                   ),
                 ),
 
-                // ── TabBar ──
+                // ── TabBar ─────────────────────────────────────────────────
+                const SizedBox(height: 16),
                 Container(
-                  color: const Color(0xFF16213E),
+                  color: _kCard,
                   child: TabBar(
                     controller: _tabController,
-                    indicatorColor: Colors.orange,
-                    labelColor: Colors.orange,
-                    unselectedLabelColor: Colors.white54,
+                    indicatorColor: _kAccent,
+                    indicatorWeight: 2,
+                    labelColor: _kAccent,
+                    unselectedLabelColor: _kTextMuted,
+                    labelStyle: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13),
                     tabs: [
                       const Tab(text: 'Профиль'),
-                      // Друзья с счётчиком заявок
                       StreamBuilder<QuerySnapshot>(
                         stream: _friendService.incomingRequestsStream(),
                         builder: (context, snap) {
@@ -414,25 +490,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 const Text('Друзья'),
                                 if (count > 0) ...[
                                   const SizedBox(width: 6),
-                                  Container(
-                                    width: 18, height: 18,
-                                    decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Colors.red),
-                                    child: Center(
-                                      child: Text('$count',
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10)),
-                                    ),
-                                  ),
+                                  _badge(count, _kAccentRed),
                                 ],
                               ],
                             ),
                           );
                         },
                       ),
-                      // Уведомления с счётчиком
                       StreamBuilder<int>(
                         stream: _notifService.unreadCountStream(),
                         builder: (context, snap) {
@@ -444,20 +508,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 const Text('Уведомления'),
                                 if (count > 0) ...[
                                   const SizedBox(width: 6),
-                                  Container(
-                                    width: 18, height: 18,
-                                    decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Colors.red),
-                                    child: Center(
-                                      child: Text(
-                                        count > 9 ? '9+' : '$count',
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10),
-                                      ),
-                                    ),
-                                  ),
+                                  _badge(count, _kAccentRed),
                                 ],
                               ],
                             ),
@@ -474,11 +525,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         body: TabBarView(
           controller: _tabController,
           children: [
-            // ── Вкладка 1: Профиль ──
             _buildProfileTab(rank, coins, cost, isMax, nextRank),
-            // ── Вкладка 2: Друзья ──
             _buildFriendsTab(),
-            // ── Вкладка 3: Уведомления ──
             _buildNotificationsTab(),
           ],
         ),
@@ -497,17 +545,32 @@ class _ProfileScreenState extends State<ProfileScreen>
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF16213E),
-                borderRadius: BorderRadius.circular(14),
+                color: _kCard,
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                    color: Colors.orange.withValues(alpha: 0.3)),
+                    color: _kAccent.withOpacity(0.3), width: 1),
+                boxShadow: [
+                  BoxShadow(
+                      color: _kAccent.withOpacity(0.05),
+                      blurRadius: 20),
+                ],
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.star, color: Colors.orange),
-                  const SizedBox(width: 10),
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _kAccent.withOpacity(0.15),
+                      border: Border.all(
+                          color: _kAccent.withOpacity(0.4)),
+                    ),
+                    child: const Icon(Icons.star,
+                        color: _kAccent, size: 20),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,29 +579,42 @@ class _ProfileScreenState extends State<ProfileScreen>
                           isMax ? '👑 Максимальный ранг!' : 'Следующий: $nextRank',
                           style: const TextStyle(
                               color: Colors.white,
-                              fontWeight: FontWeight.bold),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14),
                         ),
                         if (!isMax)
                           Text('Стоимость: $cost 🪙',
                               style: const TextStyle(
-                                  color: Colors.white54, fontSize: 12)),
+                                  color: _kTextMuted, fontSize: 12)),
                       ],
                     ),
                   ),
                   if (!isMax)
-                    ElevatedButton(
-                      onPressed: coins >= (cost ?? 0) ? _upgradeRank : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        disabledBackgroundColor:
-                        Colors.grey.withValues(alpha: 0.3),
+                    GestureDetector(
+                      onTap: coins >= (cost ?? 0) ? _upgradeRank : null,
+                      child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 8),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        decoration: BoxDecoration(
+                          color: coins >= (cost ?? 0)
+                              ? _kAccent
+                              : _kCardDark,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: coins >= (cost ?? 0)
+                                  ? _kAccent
+                                  : _kBorder),
+                        ),
+                        child: Text(
+                          'Купить',
+                          style: TextStyle(
+                              color: coins >= (cost ?? 0)
+                                  ? Colors.white
+                                  : _kTextMuted,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      child: const Text('Купить',
-                          style: TextStyle(fontSize: 12)),
                     ),
                 ],
               ),
@@ -553,32 +629,62 @@ class _ProfileScreenState extends State<ProfileScreen>
           // Выйти
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextButton(
-              onPressed: () => showDialog(
+            child: GestureDetector(
+              onTap: () => showDialog(
                 context: context,
                 builder: (_) => AlertDialog(
-                  backgroundColor: const Color(0xFF16213E),
+                  backgroundColor: _kCard,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: const BorderSide(
+                          color: _kAccentRed, width: 1)),
                   title: const Text('Выйти?',
-                      style: TextStyle(color: Colors.white)),
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold)),
                   content: const Text('Данные сохранятся',
-                      style: TextStyle(color: Colors.white54)),
+                      style: TextStyle(color: _kTextMuted)),
                   actions: [
                     TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Отмена')),
+                        child: const Text('Отмена',
+                            style: TextStyle(color: _kTextMuted))),
                     TextButton(
                       onPressed: () {
                         Navigator.pop(context);
                         _logout();
                       },
                       child: const Text('Выйти',
-                          style: TextStyle(color: Colors.red)),
+                          style: TextStyle(
+                              color: _kAccentRed,
+                              fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
               ),
-              child: Text('Выйти из профиля',
-                  style: TextStyle(color: Colors.red.shade300)),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: _kCardDark,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: _kAccentRed.withOpacity(0.4), width: 1),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.logout_rounded,
+                        color: _kAccentRed, size: 18),
+                    SizedBox(width: 8),
+                    Text('Выйти из профиля',
+                        style: TextStyle(
+                            color: _kAccentRed,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15)),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -595,12 +701,14 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Column(
         children: [
           Container(
-            color: const Color(0xFF1A1A2E),
-            child: const TabBar(
-              indicatorColor: Colors.blue,
-              labelColor: Colors.blue,
-              unselectedLabelColor: Colors.white54,
-              tabs: [
+            color: _kCardDark,
+            child: TabBar(
+              indicatorColor: _kAccent,
+              indicatorWeight: 2,
+              labelColor: _kAccent,
+              unselectedLabelColor: _kTextMuted,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+              tabs: const [
                 Tab(text: 'Друзья'),
                 Tab(text: 'Заявки'),
               ],
@@ -615,16 +723,23 @@ class _ProfileScreenState extends State<ProfileScreen>
                   builder: (context, snap) {
                     if (snap.connectionState == ConnectionState.waiting) {
                       return const Center(
-                          child: CircularProgressIndicator(
-                              color: Colors.orange));
+                          child: CircularProgressIndicator(color: _kAccent));
                     }
                     if (!snap.hasData || snap.data!.docs.isEmpty) {
                       return const Center(
-                        child: Text('Пока нет друзей 😔',
-                            style: TextStyle(color: Colors.white54)),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('😔', style: TextStyle(fontSize: 48)),
+                            SizedBox(height: 12),
+                            Text('Пока нет друзей',
+                                style: TextStyle(color: _kTextMuted)),
+                          ],
+                        ),
                       );
                     }
                     return ListView.builder(
+                      padding: const EdgeInsets.only(top: 8),
                       itemCount: snap.data!.docs.length,
                       itemBuilder: (context, i) {
                         final doc = snap.data!.docs[i];
@@ -646,81 +761,30 @@ class _ProfileScreenState extends State<ProfileScreen>
                             if (!userSnap.hasData) return const SizedBox();
                             final ud = userSnap.data!.data()
                             as Map<String, dynamic>? ?? {};
-                            final name = ud['name'] ?? 'Player';
+                            final name   = ud['name']   ?? 'Player';
                             final avatar = ud['avatar'] ?? '😊';
                             final status = ud['status'] ?? 'offline';
                             final isOnline = status == 'online';
 
-                            return ListTile(
+                            return _FriendTile(
+                              name: name,
+                              avatar: avatar,
+                              isOnline: isOnline,
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) => UserProfileScreen(
-                                        uid: friendUid)),
+                                    builder: (_) =>
+                                        UserProfileScreen(uid: friendUid)),
                               ),
-                              leading: Stack(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor:
-                                    Colors.deepPurple.shade300,
-                                    child: Text(avatar,
-                                        style: const TextStyle(
-                                            fontSize: 22)),
-                                  ),
-                                  Positioned(
-                                    right: 0, bottom: 0,
-                                    child: Container(
-                                      width: 12, height: 12,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: isOnline
-                                            ? Colors.green
-                                            : Colors.grey,
-                                        border: Border.all(
-                                            color: const Color(0xFF1A1A2E),
-                                            width: 2),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              onMessage: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        ChatScreen(otherUid: friendUid)),
                               ),
-                              title: Text(name,
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold)),
-                              subtitle: Text(
-                                isOnline ? 'онлайн' : 'оффлайн',
-                                style: TextStyle(
-                                    color: isOnline
-                                        ? Colors.green
-                                        : Colors.white38,
-                                    fontSize: 12),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Написать
-                                  IconButton(
-                                    icon: const Icon(Icons.message,
-                                        color: Colors.blue, size: 20),
-                                    onPressed: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) => ChatScreen(
-                                              otherUid: friendUid)),
-                                    ),
-                                  ),
-                                  // Удалить
-                                  IconButton(
-                                    icon: const Icon(Icons.person_remove,
-                                        color: Colors.red, size: 20),
-                                    onPressed: () async {
-                                      await _friendService
-                                          .removeFriend(friendUid);
-                                    },
-                                  ),
-                                ],
-                              ),
+                              onRemove: () async {
+                                await _friendService.removeFriend(friendUid);
+                              },
                             );
                           },
                         );
@@ -735,16 +799,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                   builder: (context, snap) {
                     if (snap.connectionState == ConnectionState.waiting) {
                       return const Center(
-                          child: CircularProgressIndicator(
-                              color: Colors.orange));
+                          child: CircularProgressIndicator(color: _kAccent));
                     }
                     if (!snap.hasData || snap.data!.docs.isEmpty) {
                       return const Center(
                         child: Text('Нет входящих заявок',
-                            style: TextStyle(color: Colors.white54)),
+                            style: TextStyle(color: _kTextMuted)),
                       );
                     }
                     return ListView.builder(
+                      padding: const EdgeInsets.only(top: 8),
                       itemCount: snap.data!.docs.length,
                       itemBuilder: (context, i) {
                         final doc = snap.data!.docs[i];
@@ -763,40 +827,40 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ? userSnap.data!.data()
                             as Map<String, dynamic>
                                 : <String, dynamic>{};
-                            final name = ud['name'] ?? 'Player';
+                            final name   = ud['name']   ?? 'Player';
                             final avatar = ud['avatar'] ?? '😊';
 
-                            return ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor:
-                                Colors.deepPurple.shade300,
-                                child: Text(avatar,
-                                    style:
-                                    const TextStyle(fontSize: 22)),
+                            return Container(
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _kCard,
+                                borderRadius: BorderRadius.circular(14),
+                                border:
+                                Border.all(color: _kBorder, width: 1),
                               ),
-                              title: Text(name,
-                                  style: const TextStyle(
-                                      color: Colors.white)),
-                              subtitle: const Text('Хочет добавить тебя',
-                                  style: TextStyle(
-                                      color: Colors.white54,
-                                      fontSize: 12)),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.check_circle,
-                                        color: Colors.green),
-                                    onPressed: () => _friendService
-                                        .acceptRequest(fromUid),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.cancel,
-                                        color: Colors.red),
-                                    onPressed: () => _friendService
-                                        .declineRequest(fromUid),
-                                  ),
-                                ],
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 4),
+                                leading: _avatarWidget(avatar),
+                                title: Text(name,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                                subtitle: const Text('Хочет добавить тебя',
+                                    style: TextStyle(
+                                        color: _kTextMuted, fontSize: 12)),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _iconBtn(Icons.check_circle, _kAccent,
+                                            () => _friendService
+                                            .acceptRequest(fromUid)),
+                                    _iconBtn(Icons.cancel, _kAccentRed,
+                                            () => _friendService
+                                            .declineRequest(fromUid)),
+                                  ],
+                                ),
                               ),
                             );
                           },
@@ -809,21 +873,30 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
 
-          // Кнопка поиска друга
+          // Кнопка поиска
           Padding(
             padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _showSearchFriend,
-                icon: const Icon(Icons.person_search),
-                label: const Text('Найти игрока по ID'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+            child: GestureDetector(
+              onTap: _showSearchFriend,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: _kCard,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _kAccent, width: 1.5),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.person_search, color: _kAccent, size: 20),
+                    SizedBox(width: 8),
+                    Text('Найти игрока по ID',
+                        style: TextStyle(
+                            color: _kAccent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15)),
+                  ],
                 ),
               ),
             ),
@@ -838,38 +911,53 @@ class _ProfileScreenState extends State<ProfileScreen>
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF16213E),
+        backgroundColor: _kCard,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: _kAccent, width: 1)),
         title: const Text('Найти игрока',
-            style: TextStyle(color: Colors.white)),
+            style: TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: _friendIdController,
-          style: const TextStyle(color: Colors.white, letterSpacing: 2),
+          style: const TextStyle(
+              color: Colors.white, letterSpacing: 2),
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             hintText: 'Введи ID игрока',
-            hintStyle: const TextStyle(color: Colors.white38),
+            hintStyle: const TextStyle(color: _kTextMuted),
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.1),
+            fillColor: _kCardDark,
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none),
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                const BorderSide(color: _kAccent, width: 1)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                const BorderSide(color: _kBorder, width: 1)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                const BorderSide(color: _kAccent, width: 1.5)),
             prefixText: '#',
             prefixStyle: const TextStyle(
-                color: Colors.orange, fontWeight: FontWeight.bold),
+                color: _kAccent, fontWeight: FontWeight.bold),
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            onPressed: () async {
+              child: const Text('Отмена',
+                  style: TextStyle(color: _kTextMuted))),
+          _NeonButton(
+            label: 'Найти',
+            onTap: () async {
               final input = _friendIdController.text.trim();
               if (input.isEmpty) return;
               Navigator.pop(context);
-              final user = await _friendService
-                  .findUserById('#$input');
+              final user =
+              await _friendService.findUserById('#$input');
               if (!mounted) return;
               if (user == null) {
                 _showSnack('Игрок не найден 😔');
@@ -886,7 +974,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                         UserProfileScreen(uid: user['uid'])),
               );
             },
-            child: const Text('Найти'),
           ),
         ],
       ),
@@ -902,10 +989,23 @@ class _ProfileScreenState extends State<ProfileScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
-                onPressed: _notifService.markAllRead,
-                child: const Text('Все прочитано',
-                    style: TextStyle(color: Colors.orange)),
+              GestureDetector(
+                onTap: _notifService.markAllRead,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _kCard,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: _kAccent.withOpacity(0.4)),
+                  ),
+                  child: const Text('Все прочитано',
+                      style: TextStyle(
+                          color: _kAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                ),
               ),
             ],
           ),
@@ -916,25 +1016,32 @@ class _ProfileScreenState extends State<ProfileScreen>
             builder: (context, snap) {
               if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(
-                    child: CircularProgressIndicator(
-                        color: Colors.orange));
+                    child: CircularProgressIndicator(color: _kAccent));
               }
               if (!snap.hasData || snap.data!.docs.isEmpty) {
                 return const Center(
-                  child: Text('Нет уведомлений',
-                      style: TextStyle(color: Colors.white54)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('🔔', style: TextStyle(fontSize: 48)),
+                      SizedBox(height: 12),
+                      Text('Нет уведомлений',
+                          style: TextStyle(color: _kTextMuted)),
+                    ],
+                  ),
                 );
               }
 
               return ListView.builder(
+                padding: const EdgeInsets.only(top: 8),
                 itemCount: snap.data!.docs.length,
                 itemBuilder: (context, i) {
-                  final doc = snap.data!.docs[i];
+                  final doc  = snap.data!.docs[i];
                   final data = doc.data() as Map<String, dynamic>;
-                  final type = data['type'] ?? '';
-                  final fromUid = data['fromUid'] ?? '';
-                  final text = data['text'] ?? '';
-                  final read = data['read'] ?? false;
+                  final type    = data['type']     ?? '';
+                  final fromUid = data['fromUid']  ?? '';
+                  final text    = data['text']     ?? '';
+                  final read    = data['read']     ?? false;
                   final time =
                   (data['createdAt'] as Timestamp?)?.toDate();
 
@@ -942,31 +1049,36 @@ class _ProfileScreenState extends State<ProfileScreen>
                   Color color;
                   switch (type) {
                     case 'friend_request':
-                      icon = Icons.person_add;
-                      color = Colors.blue;
+                      icon = Icons.person_add; color = const Color(0xFF5B8DEF);
                       break;
                     case 'friend_accepted':
-                      icon = Icons.people;
-                      color = Colors.green;
+                      icon = Icons.people; color = _kAccent;
                       break;
                     case 'game_invite':
-                      icon = Icons.sports_esports;
-                      color = Colors.purple;
+                      icon = Icons.sports_esports; color = const Color(0xFFBB86FC);
                       break;
                     case 'message':
-                      icon = Icons.message;
-                      color = Colors.orange;
+                      icon = Icons.message; color = const Color(0xFFFFD700);
                       break;
                     default:
-                      icon = Icons.notifications;
-                      color = Colors.white;
+                      icon = Icons.notifications; color = Colors.white;
                   }
 
                   return Container(
-                    color: read
-                        ? Colors.transparent
-                        : Colors.white.withValues(alpha: 0.05),
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: read ? _kCard : _kCard,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: read
+                              ? _kBorder
+                              : color.withOpacity(0.4),
+                          width: 1),
+                    ),
                     child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
                       onTap: () async {
                         await _notifService.markRead(doc.id);
                         if (type == 'friend_request') {
@@ -974,9 +1086,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                           _showSnack('Заявка принята ✅');
                         }
                       },
-                      leading: CircleAvatar(
-                        backgroundColor: color.withValues(alpha: 0.2),
-                        child: Icon(icon, color: color, size: 22),
+                      leading: Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: color.withOpacity(0.15),
+                          border: Border.all(
+                              color: color.withOpacity(0.4)),
+                        ),
+                        child: Icon(icon, color: color, size: 20),
                       ),
                       title: FutureBuilder<DocumentSnapshot>(
                         future: FirebaseFirestore.instance
@@ -989,35 +1107,37 @@ class _ProfileScreenState extends State<ProfileScreen>
                               userSnap.data!.exists) {
                             final ud = userSnap.data!.data();
                             if (ud != null) {
-                              name = (ud as Map<String, dynamic>)[
-                              'name'] ??
-                                  'Player';
+                              name =
+                                  (ud as Map<String, dynamic>)['name'] ??
+                                      'Player';
                             }
                           }
                           return Text(name,
                               style: const TextStyle(
                                   color: Colors.white,
-                                  fontWeight: FontWeight.bold));
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14));
                         },
                       ),
                       subtitle: Text(text,
                           style: const TextStyle(
-                              color: Colors.white54, fontSize: 12)),
+                              color: _kTextMuted, fontSize: 12)),
                       trailing: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (!read)
                             Container(
                               width: 8, height: 8,
+                              margin: const EdgeInsets.only(bottom: 4),
                               decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Colors.orange),
+                                  color: _kAccent),
                             ),
                           if (time != null)
                             Text(
                               '${time.hour}:${time.minute.toString().padLeft(2, '0')}',
                               style: const TextStyle(
-                                  color: Colors.white38, fontSize: 10),
+                                  color: _kTextMuted, fontSize: 10),
                             ),
                         ],
                       ),
@@ -1032,38 +1152,40 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  // ── Утилиты ────────────────────────────────────────────────────────────────
+
   Widget _rankBadge(String rank) {
     final colors = {
-      'Новичок': Colors.green,
-      'Медиум': Colors.orange,
-      'Профи': Colors.blue,
-      'Легенда': Colors.purple,
+      'Новичок': _kAccent,
+      'Медиум'  : const Color(0xFFFFD700),
+      'Профи'   : const Color(0xFF5B8DEF),
+      'Легенда' : const Color(0xFFBB86FC),
     };
     final icons = {
       'Новичок': '🥇',
-      'Медиум': '🥈',
-      'Профи': '🏆',
-      'Легенда': '👑'
+      'Медиум'  : '🥈',
+      'Профи'   : '🏆',
+      'Легенда' : '👑',
     };
     final color = colors[rank] ?? Colors.grey;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
+        color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color, width: 1.5),
+        border: Border.all(color: color.withOpacity(0.6), width: 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(icons[rank] ?? '🏅',
-              style: const TextStyle(fontSize: 16)),
+              style: const TextStyle(fontSize: 15)),
           const SizedBox(width: 6),
           Text(rank,
               style: TextStyle(
                   color: color,
                   fontWeight: FontWeight.bold,
-                  fontSize: 14)),
+                  fontSize: 13)),
         ],
       ),
     );
@@ -1074,31 +1196,24 @@ class _ProfileScreenState extends State<ProfileScreen>
         style: TextStyle(
             color: c, fontSize: 22, fontWeight: FontWeight.bold)),
     const SizedBox(height: 4),
-    Text(l,
-        style:
-        const TextStyle(color: Colors.white38, fontSize: 12)),
+    Text(l, style: const TextStyle(color: _kTextMuted, fontSize: 12)),
   ]);
 
   Widget _divider() =>
-      Container(width: 1, height: 36, color: Colors.white12);
+      Container(width: 1, height: 36, color: _kBorder);
 
-  Widget _section(String title, Widget content, {Widget? action}) {
+  Widget _section(String title, Widget content) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title,
-                  style: const TextStyle(
-                      color: Colors.white54,
-                      fontSize: 13,
-                      letterSpacing: 1.2)),
-              if (action != null) action,
-            ],
-          ),
+          Text(title,
+              style: const TextStyle(
+                  color: _kTextMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5)),
           const SizedBox(height: 10),
           content,
         ],
@@ -1108,10 +1223,10 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _badges(String rank) {
     final list = [
-      {'t': 'Новичок', 'i': '🥇', 'c': Colors.green},
-      {'t': 'Медиум', 'i': '🥈', 'c': Colors.orange},
-      {'t': 'Профи', 'i': '🏆', 'c': Colors.blue},
-      {'t': 'Легенда', 'i': '👑', 'c': Colors.purple},
+      {'t': 'Новичок', 'i': '🥇', 'c': _kAccent},
+      {'t': 'Медиум',  'i': '🥈', 'c': const Color(0xFFFFD700)},
+      {'t': 'Профи',   'i': '🏆', 'c': const Color(0xFF5B8DEF)},
+      {'t': 'Легенда', 'i': '👑', 'c': const Color(0xFFBB86FC)},
     ];
     final idx = _rankOrder.indexOf(rank);
     return Row(
@@ -1123,38 +1238,207 @@ class _ProfileScreenState extends State<ProfileScreen>
             margin: const EdgeInsets.only(right: 6),
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFF16213E),
-              borderRadius: BorderRadius.circular(12),
+              color: _kCard,
+              borderRadius: BorderRadius.circular(14),
               border: unlocked
-                  ? Border.all(
-                  color: color.withValues(alpha: 0.5), width: 1.5)
+                  ? Border.all(color: color.withOpacity(0.5), width: 1.5)
+                  : Border.all(color: _kBorder, width: 1),
+              boxShadow: unlocked
+                  ? [
+                BoxShadow(
+                    color: color.withOpacity(0.1),
+                    blurRadius: 12)
+              ]
                   : null,
             ),
             child: Column(
               children: [
                 Text(e.value['i'] as String,
                     style: TextStyle(
-                        fontSize: 26,
-                        color: unlocked ? null : Colors.black45)),
+                        fontSize: 24,
+                        color: unlocked ? null : const Color(0xFF2A2A4A))),
                 const SizedBox(height: 4),
                 Text(e.value['t'] as String,
                     style: TextStyle(
-                        color:
-                        unlocked ? Colors.white : Colors.white30,
+                        color: unlocked ? Colors.white : _kTextMuted,
                         fontSize: 9,
                         fontWeight: FontWeight.bold)),
                 const SizedBox(height: 2),
                 Text(unlocked ? '✓ Получен' : '🔒 Закрыт',
                     style: TextStyle(
-                        color: unlocked
-                            ? Colors.greenAccent
-                            : Colors.white24,
+                        color: unlocked ? _kAccent : _kTextMuted,
                         fontSize: 8)),
               ],
             ),
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _badge(int count, Color color) => Container(
+    width: 18, height: 18,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    child: Center(
+      child: Text(
+        count > 9 ? '9+' : '$count',
+        style: const TextStyle(color: Colors.white, fontSize: 10),
+      ),
+    ),
+  );
+
+  Widget _avatarWidget(String avatar, {bool isOnline = false}) {
+    return Stack(
+      children: [
+        Container(
+          width: 44, height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _kCard,
+            border: Border.all(color: _kBorder),
+          ),
+          child: Center(
+              child: Text(avatar, style: const TextStyle(fontSize: 22))),
+        ),
+        if (isOnline)
+          Positioned(
+            right: 0, bottom: 0,
+            child: Container(
+              width: 12, height: 12,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _kAccent,
+                border: Border.all(color: _kBg, width: 2),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _iconBtn(IconData icon, Color color, VoidCallback onTap) =>
+      IconButton(
+        icon: Icon(icon, color: color, size: 22),
+        onPressed: onTap,
+      );
+}
+
+// ─── Переиспользуемые компоненты ──────────────────────────────────────────────
+
+class _FriendTile extends StatelessWidget {
+  final String name, avatar;
+  final bool isOnline;
+  final VoidCallback onTap, onMessage, onRemove;
+
+  const _FriendTile({
+    required this.name,
+    required this.avatar,
+    required this.isOnline,
+    required this.onTap,
+    required this.onMessage,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kBorder, width: 1),
+      ),
+      child: ListTile(
+        contentPadding:
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        onTap: onTap,
+        leading: Stack(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _kCardDark,
+                border: Border.all(
+                    color: isOnline
+                        ? _kAccent.withOpacity(0.5)
+                        : _kBorder),
+              ),
+              child: Center(
+                  child: Text(avatar, style: const TextStyle(fontSize: 22))),
+            ),
+            Positioned(
+              right: 0, bottom: 0,
+              child: Container(
+                width: 12, height: 12,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isOnline ? _kAccent : const Color(0xFF444466),
+                  border: Border.all(color: _kBg, width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        title: Text(name,
+            style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14)),
+        subtitle: Text(
+          isOnline ? 'онлайн' : 'оффлайн',
+          style: TextStyle(
+              color: isOnline ? _kAccent : _kTextMuted,
+              fontSize: 12),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.message_rounded,
+                  color: Color(0xFF5B8DEF), size: 20),
+              onPressed: onMessage,
+            ),
+            IconButton(
+              icon: Icon(Icons.person_remove_rounded,
+                  color: _kAccentRed.withOpacity(0.8), size: 20),
+              onPressed: onRemove,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NeonButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _NeonButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: _kAccent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+                color: _kAccent.withOpacity(0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Text(label,
+            style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14)),
+      ),
     );
   }
 }
