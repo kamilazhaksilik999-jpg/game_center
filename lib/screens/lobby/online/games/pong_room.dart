@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../../../features/leaderboard/leaderboard_provider.dart'; // ← НОВОЕ
 
 const double kPFW    = 400.0;
 const double kPFH    = 600.0;
@@ -364,9 +363,6 @@ class _PongOnlineGameState extends State<PongOnlineGame>
   final _rng = Random();
   final _db  = FirebaseFirestore.instance;
 
-  // ← НОВОЕ
-  final _leaderboard = LeaderboardProvider();
-
   double _ballX = kPFW / 2, _ballY = kPFH / 2;
   double _ballVx = 0, _ballVy = 0;
 
@@ -385,6 +381,7 @@ class _PongOnlineGameState extends State<PongOnlineGame>
   int  _countdown   = 3;
   bool _inCountdown = true;
 
+  // Тикер через AnimationController
   AnimationController? _tickerCtrl;
   late AnimationController _bgPulse;
 
@@ -392,6 +389,7 @@ class _PongOnlineGameState extends State<PongOnlineGame>
   Timer? _countdownTimer;
   StreamSubscription? _roomSub;
 
+  // Данные для painter — обновляются напрямую без setState
   double _paintBallX = kPFW / 2, _paintBallY = kPFH / 2;
   double _paintP1Y   = kPFH / 2, _paintP2Y   = kPFH / 2;
   double _paintBg    = 0;
@@ -415,14 +413,6 @@ class _PongOnlineGameState extends State<PongOnlineGame>
     _roomSub?.cancel();
     _bgPulse.dispose();
     super.dispose();
-  }
-
-  // ← НОВОЕ: сохранение результата в рейтинг
-  Future<void> _onGameFinished(bool win) async {
-    final userId = _leaderboard.currentUserId;
-    if (userId != null) {
-      await _leaderboard.updateAfterMatch(userId: userId, win: win);
-    }
   }
 
   // ── Firestore ─────────────────────────────────────────────────────────────
@@ -452,13 +442,10 @@ class _PongOnlineGameState extends State<PongOnlineGame>
         _tickerCtrl?.dispose();
         _tickerCtrl = null;
         _syncTimer?.cancel();
-        // ← НОВОЕ: определяем победителя и сохраняем
-        final iWon = widget.isHost ? winner == 'p1' : winner == 'p2';
         setState(() {
           _gameOver = true;
-          _iWon = iWon;
+          _iWon = widget.isHost ? winner == 'p1' : winner == 'p2';
         });
-        _onGameFinished(iWon); // ← НОВОЕ
       }
     });
   }
@@ -499,7 +486,7 @@ class _PongOnlineGameState extends State<PongOnlineGame>
     _hitCount = 0;
   }
 
-  // ── Тикер ────────────────────────────────────────────────────────────────
+  // ── Тикер через AnimationController ──────────────────────────────────────
 
   void _startTicker() {
     _tickerCtrl?.dispose();
@@ -516,6 +503,7 @@ class _PongOnlineGameState extends State<PongOnlineGame>
   void _tick() {
     if (!_playing) return;
 
+    // Двигаем свою ракетку локально мгновенно
     if (_touching) {
       final dy = _touchY - _myY;
       final step = dy.sign * min(9.0, dy.abs());
@@ -526,12 +514,14 @@ class _PongOnlineGameState extends State<PongOnlineGame>
       _ballX += _ballVx;
       _ballY += _ballVy;
 
+      // Верх/низ
       if (_ballY - kPBallR <= 0) {
         _ballY = kPBallR; _ballVy = _ballVy.abs();
       } else if (_ballY + kPBallR >= kPFH) {
         _ballY = kPFH - kPBallR; _ballVy = -_ballVy.abs();
       }
 
+      // P1 (хост = левая ракетка)
       final p1X = kPPMrg + kPPadW;
       if (_ballVx < 0 &&
           _ballX - kPBallR <= p1X &&
@@ -546,6 +536,7 @@ class _PongOnlineGameState extends State<PongOnlineGame>
         HapticFeedback.lightImpact();
       }
 
+      // P2 (гость = правая ракетка) — хост считает за гостя по _oppY
       final p2X = kPFW - kPPMrg - kPPadW;
       if (_ballVx > 0 &&
           _ballX + kPBallR >= p2X &&
@@ -560,6 +551,7 @@ class _PongOnlineGameState extends State<PongOnlineGame>
         _ballX = p2X - kPBallR - 1;
       }
 
+      // Очко
       if (_ballX + kPBallR < 0) {
         _playing = false;
         _score2++;
@@ -581,6 +573,7 @@ class _PongOnlineGameState extends State<PongOnlineGame>
       }
     }
 
+    // Обновляем данные для painter напрямую
     _paintBallX = _ballX;
     _paintBallY = _ballY;
     _paintP1Y   = widget.isHost ? _myY  : _oppY;
@@ -769,39 +762,7 @@ class _PongOnlineGameState extends State<PongOnlineGame>
         Text('$_score1 : $_score2',
             style: const TextStyle(color: Colors.white54,
                 fontSize: 28, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        // ← НОВОЕ: отображение изменения рейтинга
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: BoxDecoration(
-            color: _iWon
-                ? const Color(0xFF00E5FF).withOpacity(0.15)
-                : const Color(0xFFFF4081).withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _iWon
-                  ? const Color(0xFF00E5FF).withOpacity(0.4)
-                  : const Color(0xFFFF4081).withOpacity(0.4),
-            ),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(
-              _iWon ? Icons.trending_up : Icons.trending_down,
-              color: _iWon ? Colors.greenAccent : Colors.redAccent,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _iWon ? '+30 рейтинга' : '-5 рейтинга',
-              style: TextStyle(
-                color: _iWon ? Colors.greenAccent : Colors.redAccent,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 40),
         GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
