@@ -1,17 +1,34 @@
-# game_center
+🎮 Game Center
 
-A new Flutter project.
+Game Center — это современное мобильное приложение, разработанное с использованием Flutter, которое объединяет набор мини-игр в единой экосистеме.
 
-## Getting Started
+Проект направлен на создание удобной игровой платформы с централизованным доступом к играм, системой сохранения прогресса и онлайн-возможностями через Firebase.
 
-This project is a starting point for a Flutter application.
+💡 О проекте
 
-A few resources to get you started if this is your first Flutter project:
+Game Center был создан как командный учебный проект, цель которого — освоение мобильной разработки, работы с облачными сервисами и совместной разработки через GitHub.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Приложение обеспечивает пользователю единое пространство, где можно запускать мини-игры, сохранять прогресс и соревноваться с другими игроками.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+👥 Команда разработки
+👩‍💻 Ажелен — разработка UI/UX, создание интерфейсов и анимаций
+👩‍💻 Камила — реализация игровой логики и функциональной части приложения
+👩‍💻 Айнура — интеграция Firebase, работа с GitHub, тестирование и сборка проекта
+🚀 Функциональность приложения
+🎮 Система мини-игр в одном приложении
+🔥 Интеграция с Firebase (Realtime Database / Firestore)
+👤 Система пользователей (авторизация и хранение данных)
+💾 Сохранение прогресса и результатов игр
+🏆 Онлайн-таблица лидеров (Leaderboard)
+🌙 Поддержка светлой и тёмной темы
+🎬 Плавные и современные UI-анимации
+📱 Адаптивный интерфейс под разные устройства
+🛠 Технологический стек
+Flutter — разработка кроссплатформенного приложения
+Dart — основной язык программирования
+Firebase — база данных, авторизация, облачное хранение
+Git & GitHub — контроль версий и командная разработка
+Android Studio — среда разработки и тестирования
+🎯 Цель проекта
+
+Создать единую игровую платформу, которая объединяет несколько мини-игр, обеспечивает хранение данных в облаке и позволяет пользователям соревноваться между собой в режиме реального времени.

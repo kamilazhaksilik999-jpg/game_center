@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// 🏠 главный экран
 import 'screens/home/home_screen.dart';
@@ -6,33 +7,38 @@ import 'screens/diff_start_screen.dart';
 
 /// 🪙 СЕРВИС МОНЕТ
 import 'core/services/coin_service.dart';
-
-/// 🎮 ИГРЫ
 import 'games/solo/memory/memory_screen.dart';
 import 'games/solo/math/math_screen.dart';
 import 'games/solo/clicker/clicker_screen.dart';
 import 'games/solo/tic_tac_toe/tic_tac_toe_screen.dart';
 import 'games/solo/sudoku/sudoku_screen.dart';
 import 'screens/level_select_screen.dart';
+import 'screens/spin_wheel_screen.dart';
 
-/// 🔥 ДОБАВИЛ FIREBASE
+/// 🛒 ДОБАВИЛ МАГАЗИН
+import 'screens/shop/shop_screen.dart';
+
+/// 🔥 FIREBASE
 import 'package:firebase_core/firebase_core.dart';
-
-/// 🔥 ДОБАВИЛ MAIN
+import 'firebase_options.dart';
+import 'screens/profile/profile_screen.dart';
+import 'screens/auth/auth_screen.dart'; // ← добавили
+import 'screens/friends/friends_screen.dart';
+import 'screens/notifications/notifications_screen.dart';
+import 'core/services/presence_service.dart';
+/// 🔥 MAIN
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  /// 🔥 ТВОЙ CONFIG (Я ПОДСТАВИЛ РЕАЛЬНЫЕ ДАННЫЕ)
   await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyABnMg83_sAmB5MqqSVFqTEKmxXKJh072s",
-      appId: "1:984380938437:web:925a2e63c5f8f0005978ac",
-      messagingSenderId: "984380938437",
-      projectId: "game-center-b4d5c",
-      storageBucket: "game-center-b4d5c.firebasestorage.app",
-    ),
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  final presence = PresenceService();
+  FirebaseAuth.instance.authStateChanges().listen((user) {
+    if (user != null) presence.setOnline();
+    // убрали else presence.setOffline()
+  });
   runApp(const MyApp());
 }
 
@@ -49,14 +55,29 @@ class MyApp extends StatelessWidget {
 
       routes: {
         "/": (context) => const HomeScreen(),
-
+        "/friends": (context) => const FriendsScreen(),
+        "/notifications": (context) => const NotificationsScreen(),
         /// 🧭 меню
-        "/shop": (context) =>
-        const Scaffold(body: Center(child: Text("Shop"))),
+        "/shop": (context) => const ShopScreen(),
         "/lobby": (context) =>
         const Scaffold(body: Center(child: Text("Lobby"))),
-        "/profile": (context) =>
-        const Scaffold(body: Center(child: Text("Profile"))),
+
+        /// 🔥 ПРОФИЛЬ — проверяет авторизацию
+        "/profile": (context) => StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                backgroundColor: Color(0xFF1A1A2E),
+                body: Center(
+                    child: CircularProgressIndicator(color: Colors.orange)),
+              );
+            }
+            // Если вошёл — показываем профиль, иначе — экран входа
+            if (snapshot.hasData) return const ProfileScreen();
+            return const AuthScreen();
+          },
+        ),
 
         /// 🎮 ИГРЫ
         "/diff_start": (context) => const DiffStartScreen(),
@@ -66,6 +87,8 @@ class MyApp extends StatelessWidget {
         "/clicker": (context) => const ClickerScreen(),
         "/tic_tac_toe": (context) => const TicTacToeScreen(),
         "/sudoku": (context) => const SudokuScreen(),
+
+        "/spin": (context) => const SpinWheelScreen(),
       },
     );
   }
