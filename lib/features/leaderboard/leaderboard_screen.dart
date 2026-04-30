@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'leaderboard_provider.dart';
 import 'leaderboard_tile.dart';
 
-//ст
 class LeaderboardScreen extends StatelessWidget {
   LeaderboardScreen({super.key});
 
@@ -11,21 +10,21 @@ class LeaderboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = provider.currentUserId;
+
     return Scaffold(
       backgroundColor: const Color(0xFF060B1A),
-
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D1B35),
         elevation: 0,
-
         leading: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
+              color: Colors.white.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white24, width: 1),
+              border: Border.all(color: Colors.white24),
             ),
             child: const Icon(
               Icons.arrow_back_ios_new_rounded,
@@ -34,82 +33,98 @@ class LeaderboardScreen extends StatelessWidget {
             ),
           ),
         ),
-
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ShaderMask(
-              shaderCallback: (b) => const LinearGradient(
-                colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
-              ).createShader(b),
-              child: const Text("🌍", style: TextStyle(fontSize: 20)),
+        title: ShaderMask(
+          shaderCallback: (b) => const LinearGradient(
+            colors: [Color(0xFFFBBF24), Color(0xFFFFFFFF)],
+          ).createShader(b),
+          child: const Text(
+            "🌍 Мировой рейтинг",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
             ),
-            const SizedBox(width: 8),
-            ShaderMask(
-              shaderCallback: (b) => const LinearGradient(
-                colors: [Color(0xFFFBBF24), Color(0xFFFFFFFF)],
-              ).createShader(b),
-              child: const Text(
-                "Мировой рейтинг",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 19,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
         centerTitle: true,
       ),
-
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: provider.getLeaderboard(),
         builder: (context, snapshot) {
-
-          /// ⏳ Loading
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFFFBBF24),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFFFBBF24)),
             );
           }
-
-          /// ❌ Error
           if (snapshot.hasError) {
             return Center(
               child: Text(
-                "Ошибка: ${snapshot.error}",
-                style: const TextStyle(color: Colors.white),
+                'Ошибка загрузки 😢\n${snapshot.error}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white54),
               ),
             );
           }
-
-          /// 📭 Empty
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(
               child: Text(
-                "Пока никого нет 😢",
-                style: TextStyle(color: Colors.white),
+                'Пока никого нет 😢',
+                style: TextStyle(color: Colors.white54, fontSize: 16),
               ),
             );
           }
 
-          final players = snapshot.data!.docs;
+          final docs = snapshot.data!.docs;
 
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-            itemCount: players.length,
-            itemBuilder: (context, index) {
-              final data = players[index].data();
+          int? currentUserIndex;
+          Map<String, dynamic>? currentUserData;
+          if (currentUserId != null) {
+            for (int i = 0; i < docs.length; i++) {
+              if (docs[i].id == currentUserId) {
+                currentUserIndex = i;
+                currentUserData = docs[i].data();
+                break;
+              }
+            }
+          }
 
-              return _LeaderboardRow(
-                data: data,
-                index: index,
-                isCurrentUser: false, // если нужно — подключишь userId
-              );
-            },
+          int totalGamesAll = 0;
+          for (final doc in docs) {
+            totalGamesAll += (doc.data()['totalGames'] ?? 0) as int;
+          }
+
+          return Column(
+            children: [
+              _StatsHeader(
+                totalPlayers: docs.length,
+                totalGames: totalGamesAll,
+                currentUserRank:
+                currentUserIndex != null ? currentUserIndex + 1 : null,
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final docId = docs[index].id;
+                    final data = docs[index].data();
+                    return LeaderboardTile(
+                      player: data,
+                      index: index,
+                      isCurrentUser: docId == currentUserId,
+                    );
+                  },
+                ),
+              ),
+              if (currentUserData != null &&
+                  (currentUserIndex == null || currentUserIndex >= 10))
+                _StickyCurrentUser(
+                  data: currentUserData,
+                  rank: currentUserIndex != null
+                      ? currentUserIndex + 1
+                      : null,
+                ),
+            ],
           );
         },
       ),
@@ -117,91 +132,163 @@ class LeaderboardScreen extends StatelessWidget {
   }
 }
 
-// ── Строка рейтинга ───────────────────────────────────────────
+class _StatsHeader extends StatelessWidget {
+  final int totalPlayers;
+  final int totalGames;
+  final int? currentUserRank;
 
-class _LeaderboardRow extends StatelessWidget {
-  final Map<String, dynamic> data;
-  final int index;
-  final bool isCurrentUser;
-
-  const _LeaderboardRow({
-    required this.data,
-    required this.index,
-    required this.isCurrentUser,
+  const _StatsHeader({
+    required this.totalPlayers,
+    required this.totalGames,
+    this.currentUserRank,
   });
-
-  Color get _rankColor {
-    if (index == 0) return const Color(0xFFFBBF24);
-    if (index == 1) return const Color(0xFF94A3B8);
-    if (index == 2) return const Color(0xFFD97706);
-    return const Color(0xFF1E3A8A);
-  }
-
-  String get _medal {
-    if (index == 0) return "🥇";
-    if (index == 1) return "🥈";
-    if (index == 2) return "🥉";
-    return "#${index + 1}";
-  }
 
   @override
   Widget build(BuildContext context) {
-    final name = data['displayName'] ?? data['name'] ?? 'Игрок';
-    final rating = data['rating'] ?? 0;
-
-    final initials = name.length >= 2
-        ? name.substring(0, 2).toUpperCase()
-        : name.toUpperCase();
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _rankColor.withValues(alpha: 0.4)),
+        border: Border.all(color: Colors.white12),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          SizedBox(
-            width: 36,
-            child: Center(
-              child: index < 3
-                  ? Text(_medal, style: const TextStyle(fontSize: 20))
-                  : Text(
-                "#${index + 1}",
-                style: const TextStyle(color: Colors.white54),
+          _StatChip(label: 'Игроков', value: '$totalPlayers'),
+          _VerticalDivider(),
+          _StatChip(label: 'Игр сыграно', value: '$totalGames'),
+          if (currentUserRank != null) ...[
+            _VerticalDivider(),
+            _StatChip(
+              label: 'Ваш ранг',
+              value: '#$currentUserRank',
+              highlight: true,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool highlight;
+
+  const _StatChip({
+    required this.label,
+    required this.value,
+    this.highlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            color:
+            highlight ? const Color(0xFFF97316) : const Color(0xFFFBBF24),
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white38, fontSize: 11),
+        ),
+      ],
+    );
+  }
+}
+
+class _VerticalDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 30, color: Colors.white12);
+  }
+}
+
+class _StickyCurrentUser extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final int? rank;
+
+  const _StickyCurrentUser({required this.data, this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    final name =
+    (data['displayName'] ?? data['name'] ?? 'Вы').toString();
+    final rating = data['rating'] ?? 0;
+    final total = data['totalGames'] ?? 0;
+    final wins = data['wins'] ?? 0;
+    final winRate =
+    total > 0 ? ((wins / total) * 100).toStringAsFixed(0) : '0';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1B35),
+        border: Border(top: BorderSide(color: Colors.white12)),
+      ),
+      child: Container(
+        padding:
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [
+            const Color(0xFFF97316).withOpacity(0.25),
+            const Color(0xFF0F172A),
+          ]),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: const Color(0xFFF97316).withOpacity(0.6),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(
+              rank != null ? '#$rank' : '—',
+              style: const TextStyle(
+                color: Color(0xFFF97316),
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
             ),
-          ),
-
-          const SizedBox(width: 10),
-
-          CircleAvatar(
-            backgroundColor: _rankColor,
-            child: Text(
-              initials,
-              style: const TextStyle(color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Color(0xFFF97316),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Игр: $total  •  Побед: $winRate%',
+                    style: const TextStyle(
+                        color: Colors.white38, fontSize: 11),
+                  ),
+                ],
+              ),
             ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Text(
-              name,
-              style: const TextStyle(color: Colors.white),
+            Text(
+              '$rating',
+              style: const TextStyle(
+                color: Color(0xFFF97316),
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
             ),
-          ),
-
-          Text(
-            "$rating",
-            style: const TextStyle(
-              color: Colors.amber,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

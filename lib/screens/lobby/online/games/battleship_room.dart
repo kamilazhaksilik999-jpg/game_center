@@ -1,20 +1,14 @@
-// lobby/online/games/battleship/battleship_room.dart
-//
-// Стиль: точно как BattleshipAIScreen
-// Код комнаты: только цифры, 6 знаков
-
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../features/leaderboard/leaderboard_provider.dart';
 const int _kSize  = 10;
 const int _kTotal = 100;
 const List<int> _kShips = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1];
 const int _water = 0, _ship = 1, _miss = 2, _hit = 3;
-
-// ── Экран выбора комнаты ──────────────────────────────────────────────────────
 
 class BattleshipRoomScreen extends StatefulWidget {
   const BattleshipRoomScreen({super.key});
@@ -28,7 +22,6 @@ class _BattleshipRoomScreenState extends State<BattleshipRoomScreen> {
   String? _error;
   bool _loading = false;
 
-  /// Генерирует 6-значный цифровой код
   String _generateCode() {
     final rng = Random();
     return List.generate(6, (_) => rng.nextInt(10).toString()).join();
@@ -58,8 +51,6 @@ class _BattleshipRoomScreenState extends State<BattleshipRoomScreen> {
 
   Future<void> _joinRoom() async {
     final code = _ctrl.text.trim();
-
-    // Только цифры, ровно 6 знаков
     if (code.length != 6 || !RegExp(r'^\d{6}$').hasMatch(code)) {
       setState(() => _error = 'Введи 6-значный цифровой код');
       return;
@@ -114,12 +105,10 @@ class _BattleshipRoomScreenState extends State<BattleshipRoomScreen> {
           child: Column(
             children: [
               const SizedBox(height: 24),
-
-              // Иконка
               Container(
                 width: 90, height: 90,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF5B8DEF).withOpacity(0.13),
+                  color: const Color(0xFF5B8DEF).withValues(alpha: 0.13),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -127,45 +116,31 @@ class _BattleshipRoomScreenState extends State<BattleshipRoomScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-
-              // Кнопка «Создать комнату»
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _loading ? null : _createRoom,
                   icon: const Icon(Icons.add_circle_outline),
-                  label: const Text(
-                    'Создать комнату',
-                    style: TextStyle(fontSize: 17),
-                  ),
+                  label: const Text('Создать комнату', style: TextStyle(fontSize: 17)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF5B8DEF),
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFF5B8DEF).withOpacity(0.4),
+                    disabledBackgroundColor: const Color(0xFF5B8DEF).withValues(alpha: 0.4),
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
               ),
               const SizedBox(height: 28),
-
-              // Разделитель «или»
               Row(children: [
                 const Expanded(child: Divider(color: Colors.white12)),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'или',
-                    style: TextStyle(color: Colors.white38, fontSize: 14),
-                  ),
+                  child: Text('или', style: TextStyle(color: Colors.white38, fontSize: 14)),
                 ),
                 const Expanded(child: Divider(color: Colors.white12)),
               ]),
               const SizedBox(height: 28),
-
-              // Поле ввода кода (только цифры)
               TextField(
                 controller: _ctrl,
                 keyboardType: TextInputType.number,
@@ -182,11 +157,7 @@ class _BattleshipRoomScreenState extends State<BattleshipRoomScreen> {
                 textAlign: TextAlign.center,
                 decoration: InputDecoration(
                   hintText: '000000',
-                  hintStyle: const TextStyle(
-                    color: Colors.white24,
-                    fontSize: 28,
-                    letterSpacing: 8,
-                  ),
+                  hintStyle: const TextStyle(color: Colors.white24, fontSize: 28, letterSpacing: 8),
                   filled: true,
                   fillColor: const Color(0xFF0D2137),
                   errorText: _error,
@@ -214,34 +185,24 @@ class _BattleshipRoomScreenState extends State<BattleshipRoomScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Только цифры, 6 знаков',
-                style: TextStyle(color: Colors.white24, fontSize: 12),
-              ),
+              const Text('Только цифры, 6 знаков',
+                  style: TextStyle(color: Colors.white24, fontSize: 12)),
               const SizedBox(height: 16),
-
-              // Кнопка «Войти в комнату»
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _loading ? null : _joinRoom,
                   icon: const Icon(Icons.login_rounded),
-                  label: const Text(
-                    'Войти в комнату',
-                    style: TextStyle(fontSize: 17),
-                  ),
+                  label: const Text('Войти в комнату', style: TextStyle(fontSize: 17)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00C896),
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFF00C896).withOpacity(0.4),
+                    disabledBackgroundColor: const Color(0xFF00C896).withValues(alpha: 0.4),
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
               ),
-
               if (_loading)
                 const Padding(
                   padding: EdgeInsets.only(top: 28),
@@ -254,8 +215,6 @@ class _BattleshipRoomScreenState extends State<BattleshipRoomScreen> {
     );
   }
 }
-
-// ── Экран ожидания гостя ─────────────────────────────────────────────────────
 
 class _BSWaitingScreen extends StatefulWidget {
   final String code;
@@ -286,8 +245,7 @@ class _BSWaitingScreenState extends State<_BSWaitingScreen> {
         Future.delayed(const Duration(milliseconds: 800), () {
           if (mounted) {
             Navigator.pushReplacement(context, MaterialPageRoute(
-              builder: (_) =>
-                  BattleshipOnlineGame(roomId: widget.code, isHost: true),
+              builder: (_) => BattleshipOnlineGame(roomId: widget.code, isHost: true),
             ));
           }
         });
@@ -327,15 +285,9 @@ class _BSWaitingScreenState extends State<_BSWaitingScreen> {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Text('⚓', style: TextStyle(fontSize: 64)),
               const SizedBox(height: 24),
-
-              // Заголовок
-              const Text(
-                'Твоя комната',
-                style: TextStyle(color: Colors.white54, fontSize: 16),
-              ),
+              const Text('Твоя комната',
+                  style: TextStyle(color: Colors.white54, fontSize: 16)),
               const SizedBox(height: 16),
-
-              // Блок с кодом — нажать чтобы скопировать
               GestureDetector(
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: widget.code));
@@ -347,13 +299,11 @@ class _BSWaitingScreenState extends State<_BSWaitingScreen> {
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 32, vertical: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0D2137),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color: const Color(0xFF5B8DEF), width: 2),
+                    border: Border.all(color: const Color(0xFF5B8DEF), width: 2),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Text(
@@ -371,52 +321,34 @@ class _BSWaitingScreenState extends State<_BSWaitingScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Нажми, чтобы скопировать',
-                style: TextStyle(color: Colors.white24, fontSize: 12),
-              ),
+              const Text('Нажми, чтобы скопировать',
+                  style: TextStyle(color: Colors.white24, fontSize: 12)),
               const SizedBox(height: 40),
-
-              // Статус ожидания / подтверждения
               if (!_guestJoined) ...[
                 const CircularProgressIndicator(color: Color(0xFF5B8DEF)),
                 const SizedBox(height: 20),
-                const Text(
-                  'Ожидаем друга...',
-                  style: TextStyle(color: Colors.white54, fontSize: 16),
-                ),
+                const Text('Ожидаем друга...',
+                    style: TextStyle(color: Colors.white54, fontSize: 16)),
                 const SizedBox(height: 8),
-                const Text(
-                  'Поделись кодом с другом',
-                  style: TextStyle(color: Colors.white24, fontSize: 13),
-                ),
+                const Text('Поделись кодом с другом',
+                    style: TextStyle(color: Colors.white24, fontSize: 13)),
               ] else ...[
-                const Icon(Icons.check_circle,
-                    color: Color(0xFF00C896), size: 48),
+                const Icon(Icons.check_circle, color: Color(0xFF00C896), size: 48),
                 const SizedBox(height: 12),
-                const Text(
-                  'Друг подключился! Начинаем...',
-                  style: TextStyle(
-                      color: Color(0xFF00C896), fontSize: 16),
-                ),
+                const Text('Друг подключился! Начинаем...',
+                    style: TextStyle(color: Color(0xFF00C896), fontSize: 16)),
               ],
-
               const SizedBox(height: 36),
-
-              // Статус-бар в стиле AI-экрана
               _StatusBar(
                 message: _guestJoined
                     ? '✅ Соединение установлено'
                     : '🔵 Ожидание подключения по коду',
               ),
-
               const SizedBox(height: 20),
               TextButton(
                 onPressed: _cancelRoom,
-                child: const Text(
-                  'Отмена',
-                  style: TextStyle(color: Colors.redAccent, fontSize: 15),
-                ),
+                child: const Text('Отмена',
+                    style: TextStyle(color: Colors.redAccent, fontSize: 15)),
               ),
             ]),
           ),
@@ -425,8 +357,6 @@ class _BSWaitingScreenState extends State<_BSWaitingScreen> {
     );
   }
 }
-
-// ── Онлайн игра ───────────────────────────────────────────────────────────────
 
 class BattleshipOnlineGame extends StatefulWidget {
   final String roomId;
@@ -442,10 +372,11 @@ class BattleshipOnlineGame extends StatefulWidget {
 enum _OPhase { placing, battle, gameOver }
 
 class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
-  _OPhase _phase   = _OPhase.placing;
-  bool    _isReady = false;
+  _OPhase _phase    = _OPhase.placing;
+  bool    _isReady  = false;
   bool    _finished = false;
-  String  _message = 'Расставь флот';
+  String  _message  = 'Расставь флот';
+  bool    _iWon     = false; // ← НОВОЕ
 
   List<int> _myBoard  = List.filled(_kTotal, _water);
   List<int> _oppBoard = List.filled(_kTotal, _water);
@@ -456,6 +387,9 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
   final Random _rng = Random();
   StreamSubscription? _sub;
 
+  // ← НОВОЕ
+  final _leaderboard = LeaderboardProvider();
+
   String get _myPrefix  => widget.isHost ? 'p1' : 'p2';
   String get _oppPrefix => widget.isHost ? 'p2' : 'p1';
   int    get _myTurnNum => widget.isHost ? 1 : 2;
@@ -464,6 +398,14 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
   void initState() {
     super.initState();
     _listenRoom();
+  }
+
+  // ← НОВОЕ: вызывается когда игра закончилась
+  Future<void> _onGameFinished(bool win) async {
+    final userId = _leaderboard.currentUserId;
+    if (userId != null) {
+      await _leaderboard.updateAfterMatch(userId: userId, win: win);
+    }
   }
 
   void _listenRoom() {
@@ -492,11 +434,13 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
             }
             final myTurn = turn == _myTurnNum;
             if (status == 'done') {
+              final win = d['winner'] == _myPrefix;
+              _iWon    = win;
               _phase   = _OPhase.gameOver;
-              _message = d['winner'] == _myPrefix
-                  ? 'Ты победил! 🏆'
-                  : 'Противник победил 💀';
+              _message = win ? 'Ты победил! 🏆' : 'Противник победил 💀';
               _finished = true;
+              // ← НОВОЕ: обновляем рейтинг
+              _onGameFinished(win);
             } else {
               _message = myTurn ? 'Твой ход!' : 'Ход противника...';
             }
@@ -564,7 +508,6 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
 
   void _onEnemyTap(int idx) {
     if (_phase != _OPhase.battle) return;
-    // Ход разрешён только в свой ход — проверяем через Firestore turn
     FirebaseFirestore.instance
         .collection('bs_rooms')
         .doc(widget.roomId)
@@ -578,7 +521,7 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
       final oppBoard = (d['${_oppPrefix}_board'] as List).cast<int>();
       if (oppBoard[idx] == _miss || oppBoard[idx] == _hit) return;
 
-      final isHit = oppBoard[idx] == _ship;
+      final isHit  = oppBoard[idx] == _ship;
       oppBoard[idx] = isHit ? _hit : _miss;
 
       final allSunk = !oppBoard.contains(_ship);
@@ -690,14 +633,14 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
       return Scaffold(
         backgroundColor: const Color(0xFF0A1628),
         body: _OnlineGameOver(
-          result: _message,
-          onExit: () => Navigator.pop(context),
+          result : _message,
+          iWon   : _iWon, // ← НОВОЕ
+          onExit : () => Navigator.pop(context),
         ),
       );
     }
 
     final wide = MediaQuery.of(context).size.width >= 600;
-
     return Scaffold(
       backgroundColor: const Color(0xFF0A1628),
       appBar: AppBar(
@@ -716,8 +659,6 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
     );
   }
 
-  // ── Широкий layout (планшет/ноутбук) ─────────────────────────────────────
-
   Widget _buildWide() {
     const boardSize = 280.0;
     return Column(children: [
@@ -728,23 +669,23 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _BoardPanel(
-              label      : 'МОЙ ФЛОТ',
-              labelColor : const Color(0xFF00C896),
-              size       : boardSize,
-              board      : _myBoard,
-              hideShips  : false,
-              enabled    : _phase == _OPhase.placing && !_isReady,
-              onTap      : _onMyBoardTap,
+              label        : 'МОЙ ФЛОТ',
+              labelColor   : const Color(0xFF00C896),
+              size         : boardSize,
+              board        : _myBoard,
+              hideShips    : false,
+              enabled      : _phase == _OPhase.placing && !_isReady,
+              onTap        : _onMyBoardTap,
               firstSelected: _firstCell,
             ),
             _BoardPanel(
-              label      : 'ПОЛЕ ВРАГА',
-              labelColor : const Color(0xFFFF6B6B),
-              size       : boardSize,
-              board      : _oppBoard,
-              hideShips  : true,
-              enabled    : _phase == _OPhase.battle,
-              onTap      : _onEnemyTap,
+              label        : 'ПОЛЕ ВРАГА',
+              labelColor   : const Color(0xFFFF6B6B),
+              size         : boardSize,
+              board        : _oppBoard,
+              hideShips    : true,
+              enabled      : _phase == _OPhase.battle,
+              onTap        : _onEnemyTap,
               firstSelected: null,
             ),
           ],
@@ -755,8 +696,6 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
     ]);
   }
 
-  // ── Узкий layout (телефон) ───────────────────────────────────────────────
-
   Widget _buildNarrow() {
     return SingleChildScrollView(
       child: Column(children: [
@@ -764,28 +703,28 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
         if (_phase == _OPhase.placing) ...[
           const _SectionLabel(label: 'МОЙ ФЛОТ', color: Color(0xFF00C896)),
           _Grid(
-            board     : _myBoard,
-            hideShips : false,
-            enabled   : !_isReady,
-            onTap     : _onMyBoardTap,
+            board        : _myBoard,
+            hideShips    : false,
+            enabled      : !_isReady,
+            onTap        : _onMyBoardTap,
             firstSelected: _firstCell,
           ),
           _buildPlacingButtons(),
         ] else ...[
           const _SectionLabel(label: 'МОЙ ФЛОТ',   color: Color(0xFF00C896)),
           _Grid(
-            board     : _myBoard,
-            hideShips : false,
-            enabled   : false,
-            onTap     : (_) {},
+            board        : _myBoard,
+            hideShips    : false,
+            enabled      : false,
+            onTap        : (_) {},
             firstSelected: null,
           ),
           const _SectionLabel(label: 'ПОЛЕ ВРАГА', color: Color(0xFFFF6B6B)),
           _Grid(
-            board     : _oppBoard,
-            hideShips : true,
-            enabled   : true,
-            onTap     : _onEnemyTap,
+            board        : _oppBoard,
+            hideShips    : true,
+            enabled      : true,
+            onTap        : _onEnemyTap,
             firstSelected: null,
           ),
         ],
@@ -818,22 +757,20 @@ class _BattleshipOnlineGameState extends State<BattleshipOnlineGame> {
   ButtonStyle _btnStyle(Color bg) => ElevatedButton.styleFrom(
     backgroundColor: bg,
     foregroundColor: Colors.white,
-    disabledBackgroundColor: bg.withOpacity(0.3),
+    disabledBackgroundColor: bg.withValues(alpha: 0.3),
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
   );
 }
 
-// ── Общие виджеты (идентичны AI-экрану) ──────────────────────────────────────
-
 class _BoardPanel extends StatelessWidget {
-  final String   label;
-  final Color    labelColor;
-  final double   size;
+  final String    label;
+  final Color     labelColor;
+  final double    size;
   final List<int> board;
-  final bool     hideShips, enabled;
+  final bool      hideShips, enabled;
   final Function(int) onTap;
-  final int?     firstSelected;
+  final int?      firstSelected;
 
   const _BoardPanel({
     required this.label,
@@ -870,10 +807,10 @@ class _BoardPanel extends StatelessWidget {
               crossAxisCount: _kSize),
           itemCount: _kTotal,
           itemBuilder: (_, i) => _Cell(
-            value       : board[i],
-            hideShip    : hideShips,
-            isSelected  : firstSelected == i,
-            onTap       : enabled ? () => onTap(i) : null,
+            value      : board[i],
+            hideShip   : hideShips,
+            isSelected : firstSelected == i,
+            onTap      : enabled ? () => onTap(i) : null,
           ),
         ),
       ),
@@ -917,8 +854,8 @@ class _Grid extends StatelessWidget {
 }
 
 class _Cell extends StatelessWidget {
-  final int          value;
-  final bool         hideShip, isSelected;
+  final int           value;
+  final bool          hideShip, isSelected;
   final VoidCallback? onTap;
 
   const _Cell({
@@ -937,8 +874,7 @@ class _Cell extends StatelessWidget {
       bg = const Color(0xFF4A5568);
     } else if (value == _hit) {
       bg    = const Color(0xFFE53E3E);
-      child = const Icon(Icons.local_fire_department,
-          color: Colors.white, size: 10);
+      child = const Icon(Icons.local_fire_department, color: Colors.white, size: 10);
     } else if (value == _miss) {
       bg    = const Color(0xFF2D5A8E);
       child = const Icon(Icons.close, color: Colors.white54, size: 8);
@@ -1002,9 +938,9 @@ class _SectionLabel extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color      : color,
-          fontWeight : FontWeight.bold,
-          fontSize   : 15,
+          color        : color,
+          fontWeight   : FontWeight.bold,
+          fontSize     : 15,
           letterSpacing: 1,
         ),
       ),
@@ -1016,19 +952,22 @@ class _SectionLabel extends StatelessWidget {
 
 class _OnlineGameOver extends StatelessWidget {
   final String       result;
+  final bool         iWon;   // ← НОВОЕ
   final VoidCallback onExit;
 
-  const _OnlineGameOver({required this.result, required this.onExit});
+  const _OnlineGameOver({
+    required this.result,
+    required this.iWon,
+    required this.onExit,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final iWon = result.contains('Ты победил');
     return Container(
       color: const Color(0xFF0A1628),
       child: Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(iWon ? '🏆' : '💀',
-              style: const TextStyle(fontSize: 80)),
+          Text(iWon ? '🏆' : '💀', style: const TextStyle(fontSize: 80)),
           const SizedBox(height: 16),
           Text(
             iWon ? 'Победа!' : 'Поражение',
@@ -1041,6 +980,42 @@ class _OnlineGameOver extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // ← НОВОЕ: показываем изменение рейтинга
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: iWon
+                  ? const Color(0xFFFFD700).withValues(alpha: 0.15)
+                  : const Color(0xFFFF3D3D).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: iWon
+                    ? const Color(0xFFFFD700).withValues(alpha: 0.4)
+                    : const Color(0xFFFF3D3D).withValues(alpha: 0.4),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  iWon ? Icons.trending_up : Icons.trending_down,
+                  color: iWon ? Colors.greenAccent : Colors.redAccent,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  iWon ? '+30 рейтинга' : '-5 рейтинга',
+                  style: TextStyle(
+                    color: iWon ? Colors.greenAccent : Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
           Text(
             result,
             style: const TextStyle(color: Colors.white54, fontSize: 16),
@@ -1050,15 +1025,12 @@ class _OnlineGameOver extends StatelessWidget {
             onPressed: onExit,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF5B8DEF),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 40, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14)),
             ),
-            child: const Text(
-              'В меню',
-              style: TextStyle(fontSize: 18, color: Colors.white),
-            ),
+            child: const Text('В меню',
+                style: TextStyle(fontSize: 18, color: Colors.white)),
           ),
         ]),
       ),
