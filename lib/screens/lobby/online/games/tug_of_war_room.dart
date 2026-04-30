@@ -6,16 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../../core/services/coin_service.dart';
-import '../../../../../core/services/user_service.dart';
 import '../../../../../features/leaderboard/leaderboard_provider.dart';
 import '../../../../../widgets/win_dialog.dart';
 
 // ── Константы ──────────────────────────────────────────────────────────────
-const int _kMaxPos    = 12;   // тапов до победы в раунде
-const int _kGameSec   = 35;   // длительность раунда
-const int _kMaxRounds = 3;    // раундов до победы в матче (best of 5 → first to 3)
-const int _kBoostAt   = 6;    // тапов подряд для активации буста
-const int _kBoostSec  = 4;    // длительность буста (сек)
+const int _kMaxPos    = 12;
+const int _kGameSec   = 35;
+const int _kMaxRounds = 3;
+const int _kBoostAt   = 6;
+const int _kBoostSec  = 4;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ЭКРАН СОЗДАНИЯ / ВХОДА
@@ -63,7 +62,7 @@ class _TugOfWarRoomScreenState extends State<TugOfWarRoomScreen>
       'rope_pos':      0,
       'p1_taps':       0,
       'p2_taps':       0,
-      'p1_score':      0,   // победы в раундах
+      'p1_score':      0,
       'p2_score':      0,
       'p1_ready':      false,
       'p2_ready':      false,
@@ -122,7 +121,6 @@ class _TugOfWarRoomScreenState extends State<TugOfWarRoomScreen>
           _AnimatedBackground(),
           SafeArea(
             child: Column(children: [
-              // AppBar
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: Row(children: [
@@ -389,7 +387,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
   int _timeLeft = _kGameSec;
   String _winner = '';
 
-  // Комбо-система
   int _myCombo          = 0;
   DateTime? _lastMyTap;
   bool _myBoostActive   = false;
@@ -470,7 +467,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
     _currentRound = (d['current_round'] as num?)?.toInt() ?? 1;
     _winner       = d['winner'] as String? ?? '';
 
-    // Буст соперника
     final oppBoostField = widget.isHost ? 'p2_boost' : 'p1_boost';
     _oppBoostActive = d[oppBoostField] as bool? ?? false;
 
@@ -508,14 +504,16 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
     }
   }
 
-  // ── Награды по итогам матча ─────────────────────────────────────────────
+  // ── ИСПРАВЛЕНО: Награды по итогам матча ────────────────────────────────
 
   Future<void> _handleMatchEnd(String winner) async {
     final myId   = widget.isHost ? 'p1' : 'p2';
     final iWon   = winner == myId;
     final isDraw = winner == 'draw';
 
-    final userId = await UserService.getOrCreateUser();
+    // ← ИСПРАВЛЕНО: используем LeaderboardProvider напрямую вместо UserService
+    final userId = LeaderboardProvider().currentUserId;
+    if (userId == null) return;
 
     if (iWon) {
       CoinService.addCoins(15);
@@ -579,7 +577,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
     final p2s = _p2Score + (roundWinner == 'p2' ? 1 : 0);
 
     if (p1s >= _kMaxRounds || p2s >= _kMaxRounds) {
-      // Матч окончен
       final matchWinner = p1s >= _kMaxRounds ? 'p1' : 'p2';
       _roomRef.update({
         'status': 'finished',
@@ -599,7 +596,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
 
   void _startNextRound() {
     if (!widget.isHost || _finished) return;
-    // Сбрасываем в waiting сначала, чтобы оба игрока поймали countdown
     _roomRef.update({
       'status':        'countdown',
       'rope_pos':      0,
@@ -622,7 +618,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
     HapticFeedback.lightImpact();
     _tapCtrl.forward(from: 0).then((_) => _tapCtrl.reverse());
 
-    // Комбо
     final now = DateTime.now();
     final quick = _lastMyTap != null && now.difference(_lastMyTap!).inMilliseconds < 550;
     _lastMyTap = now;
@@ -633,7 +628,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
       _myCombo = 0;
     }
 
-    // Буст при комбо >= _kBoostAt
     if (_myCombo >= _kBoostAt && !_myBoostActive) {
       _myBoostActive = true;
       HapticFeedback.heavyImpact();
@@ -717,8 +711,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
     );
   }
 
-  // ── Верхняя панель ──────────────────────────────────────────────────────
-
   Widget _buildTopBar() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -727,7 +719,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
         border: Border(bottom: BorderSide(color: const Color(0xFF9B6DFF).withValues(alpha: 0.2))),
       ),
       child: Column(children: [
-        // Счёт матча
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           _ScoreDots(score: _p1Score, maxScore: _kMaxRounds, color: const Color(0xFFFF5E78), reversed: true),
           const SizedBox(width: 12),
@@ -793,8 +784,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
     );
   }
 
-  // ── Центральная часть ────────────────────────────────────────────────────
-
   Widget _buildBody() {
     return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       if (_localPhase == _TOWPhase.waiting) ...[
@@ -856,8 +845,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
     );
   }
 
-  // ── Канат ────────────────────────────────────────────────────────────────
-
   Widget _buildRope() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -880,7 +867,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
-                // Полоска
                 Container(
                   height: 20,
                   decoration: BoxDecoration(
@@ -890,7 +876,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
                     ]),
                   ),
                 ),
-                // Центр
                 Center(child: Container(
                   width: 3, height: 32,
                   decoration: BoxDecoration(
@@ -898,7 +883,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
                     borderRadius: BorderRadius.circular(2),
                   ),
                 )),
-                // Маркер
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 100),
                   curve: Curves.easeOut,
@@ -929,8 +913,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
       ]),
     );
   }
-
-  // ── Кнопка тапа ─────────────────────────────────────────────────────────
 
   Widget _buildTapButton() {
     final enabled  = _localPhase == _TOWPhase.playing;
@@ -985,8 +967,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
     );
   }
 
-  // ── Экран конца раунда ───────────────────────────────────────────────────
-
   Widget _buildRoundOver() {
     final label = _resolveRoundLabel(_winner);
     final won   = label.contains('✅');
@@ -1001,7 +981,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
             color: color, letterSpacing: 1)),
         const SizedBox(height: 28),
 
-        // Текущий счёт матча
         ScaleTransition(
           scale: _scoreScale,
           child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -1025,8 +1004,6 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
       ])),
     ]);
   }
-
-  // ── Экран победы матча ───────────────────────────────────────────────────
 
   Widget _buildGameOver() {
     final label  = _resolveWinnerLabel(_winner);
@@ -1055,8 +1032,45 @@ class _TugOfWarOnlineGameState extends State<TugOfWarOnlineGame>
         const SizedBox(height: 12),
         Text('P1: $_p1Taps тапов  •  P2: $_p2Taps тапов',
             style: const TextStyle(color: Colors.white38, fontSize: 13)),
-        const SizedBox(height: 48),
 
+        // ← НОВОЕ: отображение изменения рейтинга
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: iWon
+                ? const Color(0xFFFFD700).withValues(alpha: 0.15)
+                : isDraw
+                ? Colors.orange.withValues(alpha: 0.15)
+                : const Color(0xFFFF5E78).withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: iWon
+                  ? const Color(0xFFFFD700).withValues(alpha: 0.4)
+                  : isDraw
+                  ? Colors.orange.withValues(alpha: 0.4)
+                  : const Color(0xFFFF5E78).withValues(alpha: 0.4),
+            ),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(
+              iWon ? Icons.trending_up : isDraw ? Icons.trending_flat : Icons.trending_down,
+              color: iWon ? Colors.greenAccent : isDraw ? Colors.orange : Colors.redAccent,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              iWon ? '+30 рейтинга' : isDraw ? '+0 рейтинга' : '-5 рейтинга',
+              style: TextStyle(
+                color: iWon ? Colors.greenAccent : isDraw ? Colors.orange : Colors.redAccent,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ]),
+        ),
+
+        const SizedBox(height: 32),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 40),
           child: _TowButton(
@@ -1089,7 +1103,7 @@ class _ScoreDots extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dots = List.generate(maxScore, (i) {
-      final filled = reversed ? (i < score) : (i < score);
+      final filled = i < score;
       return Container(
         width: 12, height: 12,
         margin: const EdgeInsets.symmetric(horizontal: 2),
