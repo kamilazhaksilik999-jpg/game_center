@@ -7,7 +7,7 @@ import '../../core/services/notification_service.dart';
 import '../friends/friends_screen.dart';
 import '../friends/user_profile_screen.dart';
 import '../chat/chat_screen.dart';
-
+import '../../../../features/leaderboard/leaderboard_provider.dart';
 // ─── Цвета темы ───────────────────────────────────────────────────────────────
 const _kBg        = Color(0xFF0D0D1A);
 const _kCard      = Color(0xFF16213E);
@@ -33,6 +33,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   final _authService = AuthService();
   final _friendService = FriendService();
   final _notifService = NotificationService();
+  final _leaderboard = LeaderboardProvider(); // ← НОВОЕ
 
   late TabController _tabController;
 
@@ -98,6 +99,13 @@ class _ProfileScreenState extends State<ProfileScreen>
           _userData = data;
           _isLoading = false;
         });
+
+        // ← НОВОЕ: создаём/обновляем запись в лидерборде
+        await _leaderboard.initUser(
+          userId: user.uid,
+          displayName: data['name'] ?? user.email ?? 'Игрок',
+        );
+
       } else {
         setState(() => _isLoading = false);
       }
@@ -134,12 +142,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                 borderSide: const BorderSide(color: _kAccent, width: 1)),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                const BorderSide(color: _kBorder, width: 1)),
+                borderSide: const BorderSide(color: _kBorder, width: 1)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                const BorderSide(color: _kAccent, width: 1.5)),
+                borderSide: const BorderSide(color: _kAccent, width: 1.5)),
           ),
         ),
         actions: [
@@ -159,6 +165,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                     .collection('users')
                     .doc(_userId)
                     .update({'name': newName});
+                // ← НОВОЕ: обновляем имя и в лидерборде
+                await _leaderboard.initUser(
+                  userId: _userId!,
+                  displayName: newName,
+                );
               }
               _showSnack('Имя сохранено ✅');
             },
@@ -345,7 +356,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           SliverToBoxAdapter(
             child: Column(
               children: [
-                // ── Шапка ──────────────────────────────────────────────────
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.only(top: 56, bottom: 24),
@@ -362,7 +372,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   child: Column(
                     children: [
-                      // Кнопка назад
                       Align(
                         alignment: Alignment.topLeft,
                         child: Padding(
@@ -374,8 +383,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ),
                       ),
-
-                      // Аватар
                       GestureDetector(
                         onTap: _changeAvatar,
                         child: Stack(
@@ -385,8 +392,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: _kCard,
-                                border: Border.all(
-                                    color: _kAccent, width: 2.5),
+                                border: Border.all(color: _kAccent, width: 2.5),
                                 boxShadow: [
                                   BoxShadow(
                                       color: _kAccent.withOpacity(0.25),
@@ -405,8 +411,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: _kAccent,
-                                    border: Border.all(
-                                        color: _kBg, width: 2)),
+                                    border: Border.all(color: _kBg, width: 2)),
                                 child: const Icon(Icons.edit,
                                     size: 13, color: Colors.white),
                               ),
@@ -415,8 +420,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                       ),
                       const SizedBox(height: 14),
-
-                      // Имя
                       GestureDetector(
                         onTap: _editName,
                         child: Row(
@@ -429,22 +432,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 0.5)),
                             const SizedBox(width: 6),
-                            const Icon(Icons.edit,
-                                size: 14, color: _kTextMuted),
+                            const Icon(Icons.edit, size: 14, color: _kTextMuted),
                           ],
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text('ID: $id',
-                          style: const TextStyle(
-                              color: _kTextMuted, fontSize: 13)),
+                          style: const TextStyle(color: _kTextMuted, fontSize: 13)),
                       const SizedBox(height: 12),
                       _rankBadge(rank),
                     ],
                   ),
                 ),
-
-                // ── Статистика ─────────────────────────────────────────────
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   padding: const EdgeInsets.symmetric(vertical: 18),
@@ -464,8 +463,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ],
                   ),
                 ),
-
-                // ── TabBar ─────────────────────────────────────────────────
                 const SizedBox(height: 16),
                 Container(
                   color: _kCard,
@@ -534,14 +531,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ══════ ВКЛАДКА ПРОФИЛЬ ══════
   Widget _buildProfileTab(String rank, int coins, int? cost,
       bool isMax, String? nextRank) {
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 30),
       child: Column(
         children: [
-          // Повышение ранга
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Container(
@@ -549,12 +544,9 @@ class _ProfileScreenState extends State<ProfileScreen>
               decoration: BoxDecoration(
                 color: _kCard,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: _kAccent.withOpacity(0.3), width: 1),
+                border: Border.all(color: _kAccent.withOpacity(0.3), width: 1),
                 boxShadow: [
-                  BoxShadow(
-                      color: _kAccent.withOpacity(0.05),
-                      blurRadius: 20),
+                  BoxShadow(color: _kAccent.withOpacity(0.05), blurRadius: 20),
                 ],
               ),
               child: Row(
@@ -564,11 +556,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: _kAccent.withOpacity(0.15),
-                      border: Border.all(
-                          color: _kAccent.withOpacity(0.4)),
+                      border: Border.all(color: _kAccent.withOpacity(0.4)),
                     ),
-                    child: const Icon(Icons.star,
-                        color: _kAccent, size: 20),
+                    child: const Icon(Icons.star, color: _kAccent, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -596,14 +586,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
-                          color: coins >= (cost ?? 0)
-                              ? _kAccent
-                              : _kCardDark,
+                          color: coins >= (cost ?? 0) ? _kAccent : _kCardDark,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                              color: coins >= (cost ?? 0)
-                                  ? _kAccent
-                                  : _kBorder),
+                              color: coins >= (cost ?? 0) ? _kAccent : _kBorder),
                         ),
                         child: Text(
                           'Купить',
@@ -620,13 +606,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ),
           ),
-
-          // Жетоны
           _section('ЖЕТОНЫ', _badges(rank)),
-
           const SizedBox(height: 24),
-
-          // Выйти
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: GestureDetector(
@@ -636,12 +617,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                   backgroundColor: _kCard,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
-                      side: const BorderSide(
-                          color: _kAccentRed, width: 1)),
+                      side: const BorderSide(color: _kAccentRed, width: 1)),
                   title: const Text('Выйти?',
                       style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold)),
+                          color: Colors.white, fontWeight: FontWeight.bold)),
                   content: const Text('Данные сохранятся',
                       style: TextStyle(color: _kTextMuted)),
                   actions: [
@@ -674,8 +653,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.logout_rounded,
-                        color: _kAccentRed, size: 18),
+                    Icon(Icons.logout_rounded, color: _kAccentRed, size: 18),
                     SizedBox(width: 8),
                     Text('Выйти из профиля',
                         style: TextStyle(
@@ -692,10 +670,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ══════ ВКЛАДКА ДРУЗЬЯ ══════
   Widget _buildFriendsTab() {
     final myUid = _userId ?? '';
-
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -717,7 +693,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           Expanded(
             child: TabBarView(
               children: [
-                // Список друзей
                 StreamBuilder<QuerySnapshot>(
                   stream: _friendService.friendsStream(),
                   builder: (context, snap) {
@@ -743,15 +718,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                       itemCount: snap.data!.docs.length,
                       itemBuilder: (context, i) {
                         final doc = snap.data!.docs[i];
-                        final data =
-                        doc.data() as Map<String, dynamic>;
-                        final users =
-                        List<String>.from(data['users'] ?? []);
+                        final data = doc.data() as Map<String, dynamic>;
+                        final users = List<String>.from(data['users'] ?? []);
                         final friendUid = users.firstWhere(
                                 (u) => u != myUid,
                             orElse: () => '');
                         if (friendUid.isEmpty) return const SizedBox();
-
                         return StreamBuilder<DocumentSnapshot>(
                           stream: FirebaseFirestore.instance
                               .collection('users')
@@ -761,11 +733,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                             if (!userSnap.hasData) return const SizedBox();
                             final ud = userSnap.data!.data()
                             as Map<String, dynamic>? ?? {};
-                            final name   = ud['name']   ?? 'Player';
+                            final name = ud['name'] ?? 'Player';
                             final avatar = ud['avatar'] ?? '😊';
                             final status = ud['status'] ?? 'offline';
                             final isOnline = status == 'online';
-
                             return _FriendTile(
                               name: name,
                               avatar: avatar,
@@ -792,8 +763,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                     );
                   },
                 ),
-
-                // Входящие заявки
                 StreamBuilder<QuerySnapshot>(
                   stream: _friendService.incomingRequestsStream(),
                   builder: (context, snap) {
@@ -812,10 +781,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       itemCount: snap.data!.docs.length,
                       itemBuilder: (context, i) {
                         final doc = snap.data!.docs[i];
-                        final data =
-                        doc.data() as Map<String, dynamic>;
+                        final data = doc.data() as Map<String, dynamic>;
                         final fromUid = data['fromUid'] as String;
-
                         return FutureBuilder<DocumentSnapshot>(
                           future: FirebaseFirestore.instance
                               .collection('users')
@@ -824,12 +791,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                           builder: (context, userSnap) {
                             if (!userSnap.hasData) return const SizedBox();
                             final ud = userSnap.data!.exists
-                                ? userSnap.data!.data()
-                            as Map<String, dynamic>
+                                ? userSnap.data!.data() as Map<String, dynamic>
                                 : <String, dynamic>{};
-                            final name   = ud['name']   ?? 'Player';
+                            final name = ud['name'] ?? 'Player';
                             final avatar = ud['avatar'] ?? '😊';
-
                             return Container(
                               margin: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 4),
@@ -872,8 +837,6 @@ class _ProfileScreenState extends State<ProfileScreen>
               ],
             ),
           ),
-
-          // Кнопка поиска
           Padding(
             padding: const EdgeInsets.all(16),
             child: GestureDetector(
@@ -916,12 +879,10 @@ class _ProfileScreenState extends State<ProfileScreen>
             borderRadius: BorderRadius.circular(20),
             side: const BorderSide(color: _kAccent, width: 1)),
         title: const Text('Найти игрока',
-            style: TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold)),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: _friendIdController,
-          style: const TextStyle(
-              color: Colors.white, letterSpacing: 2),
+          style: const TextStyle(color: Colors.white, letterSpacing: 2),
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             hintText: 'Введи ID игрока',
@@ -930,19 +891,16 @@ class _ProfileScreenState extends State<ProfileScreen>
             fillColor: _kCardDark,
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                const BorderSide(color: _kAccent, width: 1)),
+                borderSide: const BorderSide(color: _kAccent, width: 1)),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                const BorderSide(color: _kBorder, width: 1)),
+                borderSide: const BorderSide(color: _kBorder, width: 1)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                const BorderSide(color: _kAccent, width: 1.5)),
+                borderSide: const BorderSide(color: _kAccent, width: 1.5)),
             prefixText: '#',
-            prefixStyle: const TextStyle(
-                color: _kAccent, fontWeight: FontWeight.bold),
+            prefixStyle:
+            const TextStyle(color: _kAccent, fontWeight: FontWeight.bold),
           ),
         ),
         actions: [
@@ -956,8 +914,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               final input = _friendIdController.text.trim();
               if (input.isEmpty) return;
               Navigator.pop(context);
-              final user =
-              await _friendService.findUserById('#$input');
+              final user = await _friendService.findUserById('#$input');
               if (!mounted) return;
               if (user == null) {
                 _showSnack('Игрок не найден 😔');
@@ -970,8 +927,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) =>
-                        UserProfileScreen(uid: user['uid'])),
+                    builder: (_) => UserProfileScreen(uid: user['uid'])),
               );
             },
           ),
@@ -980,7 +936,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ══════ ВКЛАДКА УВЕДОМЛЕНИЯ ══════
   Widget _buildNotificationsTab() {
     return Column(
       children: [
@@ -997,8 +952,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                   decoration: BoxDecoration(
                     color: _kCard,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: _kAccent.withOpacity(0.4)),
+                    border:
+                    Border.all(color: _kAccent.withOpacity(0.4)),
                   ),
                   child: const Text('Все прочитано',
                       style: TextStyle(
@@ -1031,49 +986,51 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                 );
               }
-
               return ListView.builder(
                 padding: const EdgeInsets.only(top: 8),
                 itemCount: snap.data!.docs.length,
                 itemBuilder: (context, i) {
-                  final doc  = snap.data!.docs[i];
+                  final doc = snap.data!.docs[i];
                   final data = doc.data() as Map<String, dynamic>;
-                  final type    = data['type']     ?? '';
-                  final fromUid = data['fromUid']  ?? '';
-                  final text    = data['text']     ?? '';
-                  final read    = data['read']     ?? false;
-                  final time =
-                  (data['createdAt'] as Timestamp?)?.toDate();
+                  final type = data['type'] ?? '';
+                  final fromUid = data['fromUid'] ?? '';
+                  final text = data['text'] ?? '';
+                  final read = data['read'] ?? false;
+                  final time = (data['createdAt'] as Timestamp?)?.toDate();
 
                   IconData icon;
                   Color color;
                   switch (type) {
                     case 'friend_request':
-                      icon = Icons.person_add; color = const Color(0xFF5B8DEF);
+                      icon = Icons.person_add;
+                      color = const Color(0xFF5B8DEF);
                       break;
                     case 'friend_accepted':
-                      icon = Icons.people; color = _kAccent;
+                      icon = Icons.people;
+                      color = _kAccent;
                       break;
                     case 'game_invite':
-                      icon = Icons.sports_esports; color = const Color(0xFFBB86FC);
+                      icon = Icons.sports_esports;
+                      color = const Color(0xFFBB86FC);
                       break;
                     case 'message':
-                      icon = Icons.message; color = const Color(0xFFFFD700);
+                      icon = Icons.message;
+                      color = const Color(0xFFFFD700);
                       break;
                     default:
-                      icon = Icons.notifications; color = Colors.white;
+                      icon = Icons.notifications;
+                      color = Colors.white;
                   }
 
                   return Container(
                     margin: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 4),
                     decoration: BoxDecoration(
-                      color: read ? _kCard : _kCard,
+                      color: _kCard,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                          color: read
-                              ? _kBorder
-                              : color.withOpacity(0.4),
+                          color:
+                          read ? _kBorder : color.withOpacity(0.4),
                           width: 1),
                     ),
                     child: ListTile(
@@ -1091,8 +1048,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: color.withOpacity(0.15),
-                          border: Border.all(
-                              color: color.withOpacity(0.4)),
+                          border:
+                          Border.all(color: color.withOpacity(0.4)),
                         ),
                         child: Icon(icon, color: color, size: 20),
                       ),
@@ -1103,13 +1060,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                             .get(),
                         builder: (context, userSnap) {
                           String name = '...';
-                          if (userSnap.hasData &&
-                              userSnap.data!.exists) {
+                          if (userSnap.hasData && userSnap.data!.exists) {
                             final ud = userSnap.data!.data();
                             if (ud != null) {
-                              name =
-                                  (ud as Map<String, dynamic>)['name'] ??
-                                      'Player';
+                              name = (ud as Map<String, dynamic>)['name'] ??
+                                  'Player';
                             }
                           }
                           return Text(name,
@@ -1130,8 +1085,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               width: 8, height: 8,
                               margin: const EdgeInsets.only(bottom: 4),
                               decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _kAccent),
+                                  shape: BoxShape.circle, color: _kAccent),
                             ),
                           if (time != null)
                             Text(
@@ -1152,20 +1106,18 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ── Утилиты ────────────────────────────────────────────────────────────────
-
   Widget _rankBadge(String rank) {
     final colors = {
       'Новичок': _kAccent,
-      'Медиум'  : const Color(0xFFFFD700),
-      'Профи'   : const Color(0xFF5B8DEF),
-      'Легенда' : const Color(0xFFBB86FC),
+      'Медиум': const Color(0xFFFFD700),
+      'Профи': const Color(0xFF5B8DEF),
+      'Легенда': const Color(0xFFBB86FC),
     };
     final icons = {
       'Новичок': '🥇',
-      'Медиум'  : '🥈',
-      'Профи'   : '🏆',
-      'Легенда' : '👑',
+      'Медиум': '🥈',
+      'Профи': '🏆',
+      'Легенда': '👑',
     };
     final color = colors[rank] ?? Colors.grey;
     return Container(
@@ -1178,8 +1130,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(icons[rank] ?? '🏅',
-              style: const TextStyle(fontSize: 15)),
+          Text(icons[rank] ?? '🏅', style: const TextStyle(fontSize: 15)),
           const SizedBox(width: 6),
           Text(rank,
               style: TextStyle(
@@ -1193,14 +1144,13 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _stat(String v, String l, Color c) => Column(children: [
     Text(v,
-        style: TextStyle(
-            color: c, fontSize: 22, fontWeight: FontWeight.bold)),
+        style:
+        TextStyle(color: c, fontSize: 22, fontWeight: FontWeight.bold)),
     const SizedBox(height: 4),
     Text(l, style: const TextStyle(color: _kTextMuted, fontSize: 12)),
   ]);
 
-  Widget _divider() =>
-      Container(width: 1, height: 36, color: _kBorder);
+  Widget _divider() => Container(width: 1, height: 36, color: _kBorder);
 
   Widget _section(String title, Widget content) {
     return Padding(
@@ -1224,8 +1174,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget _badges(String rank) {
     final list = [
       {'t': 'Новичок', 'i': '🥇', 'c': _kAccent},
-      {'t': 'Медиум',  'i': '🥈', 'c': const Color(0xFFFFD700)},
-      {'t': 'Профи',   'i': '🏆', 'c': const Color(0xFF5B8DEF)},
+      {'t': 'Медиум', 'i': '🥈', 'c': const Color(0xFFFFD700)},
+      {'t': 'Профи', 'i': '🏆', 'c': const Color(0xFF5B8DEF)},
       {'t': 'Легенда', 'i': '👑', 'c': const Color(0xFFBB86FC)},
     ];
     final idx = _rankOrder.indexOf(rank);
@@ -1244,11 +1194,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ? Border.all(color: color.withOpacity(0.5), width: 1.5)
                   : Border.all(color: _kBorder, width: 1),
               boxShadow: unlocked
-                  ? [
-                BoxShadow(
-                    color: color.withOpacity(0.1),
-                    blurRadius: 12)
-              ]
+                  ? [BoxShadow(color: color.withOpacity(0.1), blurRadius: 12)]
                   : null,
             ),
             child: Column(
@@ -1256,7 +1202,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Text(e.value['i'] as String,
                     style: TextStyle(
                         fontSize: 24,
-                        color: unlocked ? null : const Color(0xFF2A2A4A))),
+                        color: unlocked
+                            ? null
+                            : const Color(0xFF2A2A4A))),
                 const SizedBox(height: 4),
                 Text(e.value['t'] as String,
                     style: TextStyle(
@@ -1323,8 +1271,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       );
 }
 
-// ─── Переиспользуемые компоненты ──────────────────────────────────────────────
-
 class _FriendTile extends StatelessWidget {
   final String name, avatar;
   final bool isOnline;
@@ -1365,7 +1311,8 @@ class _FriendTile extends StatelessWidget {
                         : _kBorder),
               ),
               child: Center(
-                  child: Text(avatar, style: const TextStyle(fontSize: 22))),
+                  child:
+                  Text(avatar, style: const TextStyle(fontSize: 22))),
             ),
             Positioned(
               right: 0, bottom: 0,
@@ -1387,9 +1334,8 @@ class _FriendTile extends StatelessWidget {
                 fontSize: 14)),
         subtitle: Text(
           isOnline ? 'онлайн' : 'оффлайн',
-          style: TextStyle(
-              color: isOnline ? _kAccent : _kTextMuted,
-              fontSize: 12),
+          style:
+          TextStyle(color: isOnline ? _kAccent : _kTextMuted, fontSize: 12),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1442,4 +1388,3 @@ class _NeonButton extends StatelessWidget {
     );
   }
 }
-//а
