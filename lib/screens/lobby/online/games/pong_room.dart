@@ -15,7 +15,9 @@ const double kPInit  = 5.5;
 const double kPMax   = 14.0;
 const double kPAccel = 0.25;
 const int    kPWin   = 7;
-const int    kPSync  = 50;
+
+// Sync interval — 30ms instead of 50ms for smoother updates
+const int kPSync = 30;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 1. Экран создания / входа в комнату
@@ -363,38 +365,48 @@ class _PongOnlineGameState extends State<PongOnlineGame>
   final _rng = Random();
   final _db  = FirebaseFirestore.instance;
 
+  // ── Физика мяча ──────────────────────────────────────────────────────────
   double _ballX = kPFW / 2, _ballY = kPFH / 2;
   double _ballVx = 0, _ballVy = 0;
 
+  // ── Позиции ракеток ───────────────────────────────────────────────────────
   double _myY  = kPFH / 2;
-  double _oppY = kPFH / 2;
 
-  double _touchY  = kPFH / 2;
+  // Ракетка оппонента: последняя известная + целевая для интерполяции
+  double _oppY        = kPFH / 2;
+  double _oppYTarget  = kPFH / 2;
+  double _oppYPrev    = kPFH / 2;
+  DateTime _oppLastUpdate = DateTime.now();
+
+  // ── Касание ───────────────────────────────────────────────────────────────
+  double _touchY   = kPFH / 2;
   bool   _touching = false;
 
-  int _score1 = 0, _score2 = 0;
-  int _hitCount = 0;
-
+  // ── Счёт и состояние ─────────────────────────────────────────────────────
+  int  _score1 = 0, _score2 = 0;
+  int  _hitCount = 0;
   bool _gameOver    = false;
   bool _iWon        = false;
   bool _playing     = false;
   int  _countdown   = 3;
   bool _inCountdown = true;
 
-  // Тикер через AnimationController
+  // ── Контроллеры ───────────────────────────────────────────────────────────
   AnimationController? _tickerCtrl;
   late AnimationController _bgPulse;
-
   Timer? _syncTimer;
   Timer? _countdownTimer;
   StreamSubscription? _roomSub;
 
-  // Данные для painter — обновляются напрямую без setState
+  // ── Данные для painter (без setState) ────────────────────────────────────
   double _paintBallX = kPFW / 2, _paintBallY = kPFH / 2;
   double _paintP1Y   = kPFH / 2, _paintP2Y   = kPFH / 2;
   double _paintBg    = 0;
 
   final _repaintKey = GlobalKey();
+
+  // ── Последнее время тика (для dt-based движение) ─────────────────────────
+  DateTime _lastTick = DateTime.now();
 
   @override
   void initState() {
@@ -424,11 +436,40 @@ class _PongOnlineGameState extends State<PongOnlineGame>
       final d = snap.data()!;
 
       if (widget.isHost) {
-        _oppY = (d['p2_y'] as num).toDouble();
+        // Хост получает только позицию ракетки гостя
+        final newOppY = (d['p2_y'] as num).toDouble();
+        _oppYPrev     = _oppY;          // сохраняем текущую для интерполяции
+        _oppYTarget   = newOppY;
+        _oppLastUpdate = DateTime.now();
       } else {
-        _oppY = (d['p1_y'] as num).toDouble();
-        _ballX = (d['ball_x'] as num).toDouble();
-        _ballY = (d['ball_y'] as num).toDouble();
+        // Гость получает позицию ракетки хоста
+        final newOppY = (d['p1_y'] as num).toDouble();
+        _oppYPrev     = _oppY;
+        _oppYTarget   = newOppY;
+        _oppLastUpdate = DateTime.now();
+
+        // Гость также получает мяч с сервера, но применяет
+        // клиентское предсказание: если разница невелика — не прыгаем
+        final serverBX = (d['ball_x'] as num).toDouble();
+        final serverBY = (d['ball_y'] as num).toDouble();
+        final serverVX = (d['ball_vx'] as num?)?.toDouble() ?? _ballVx;
+        final serverVY = (d['ball_vy'] as num?)?.toDouble() ?? _ballVy;
+
+        final dist = sqrt(pow(serverBX - _ballX, 2) + pow(serverBY - _ballY, 2));
+        // Если мяч сильно отличается от предсказания — корректируем
+        if (dist > 30) {
+          _ballX  = serverBX;
+          _ballY  = serverBY;
+          _ballVx = serverVX;
+          _ballVy = serverVY;
+        } else if (dist > 5) {
+          // Мягкая коррекция: 30% к серверной позиции
+          _ballX  = _ballX  * 0.7 + serverBX * 0.3;
+          _ballY  = _ballY  * 0.7 + serverBY * 0.3;
+          _ballVx = _ballVx * 0.7 + serverVX * 0.3;
+          _ballVy = _ballVy * 0.7 + serverVY * 0.3;
+        }
+        // Иначе оставляем предсказание
       }
 
       final s1 = (d['score1'] as num).toInt();
@@ -484,11 +525,13 @@ class _PongOnlineGameState extends State<PongOnlineGame>
     _ballVx = cos(angle) * kPInit;
     _ballVy = sin(angle) * kPInit;
     _hitCount = 0;
+    _lastTick = DateTime.now();
   }
 
   // ── Тикер через AnimationController ──────────────────────────────────────
 
   void _startTicker() {
+    _lastTick = DateTime.now();
     _tickerCtrl?.dispose();
     _tickerCtrl = AnimationController(
       vsync: this,
@@ -503,24 +546,52 @@ class _PongOnlineGameState extends State<PongOnlineGame>
   void _tick() {
     if (!_playing) return;
 
-    // Двигаем свою ракетку локально мгновенно
+    final now = DateTime.now();
+    final dtMs = now.difference(_lastTick).inMicroseconds / 1000.0;
+    _lastTick = now;
+
+    // Нормализуем шаг: при 60fps dtMs≈16.7ms → factor≈1.0
+    // Это делает физику независимой от частоты кадров
+    final factor = (dtMs / 16.67).clamp(0.5, 2.0);
+
+    // ── Своя ракетка: мгновенно, без задержки ─────────────────────────────
     if (_touching) {
-      final dy = _touchY - _myY;
-      final step = dy.sign * min(9.0, dy.abs());
+      final dy   = _touchY - _myY;
+      final step = dy.sign * min(9.0 * factor, dy.abs());
       _myY = (_myY + step).clamp(kPPadH / 2, kPFH - kPPadH / 2);
     }
 
-    if (widget.isHost) {
-      _ballX += _ballVx;
-      _ballY += _ballVy;
-
-      // Верх/низ
-      if (_ballY - kPBallR <= 0) {
-        _ballY = kPBallR; _ballVy = _ballVy.abs();
-      } else if (_ballY + kPBallR >= kPFH) {
-        _ballY = kPFH - kPBallR; _ballVy = -_ballVy.abs();
+    // ── Ракетка оппонента: интерполяция к целевой позиции ─────────────────
+    // Вместо резких прыжков при каждом Firestore-снапшоте — плавное
+    // движение со скоростью, пропорциональной разнице
+        {
+      final diff = _oppYTarget - _oppY;
+      if (diff.abs() > 0.5) {
+        // Интерполяция: 35% разницы за кадр → почти не видно задержки
+        _oppY += diff * 0.35 * factor;
+      } else {
+        _oppY = _oppYTarget;
       }
+      _oppY = _oppY.clamp(kPPadH / 2, kPFH - kPPadH / 2);
+    }
 
+    // ── Физика мяча ───────────────────────────────────────────────────────
+    // Гость тоже симулирует мяч локально (предсказание)
+    // Коррекция от сервера происходит в _listenRoom
+    _ballX += _ballVx * factor;
+    _ballY += _ballVy * factor;
+
+    // Верх/низ
+    if (_ballY - kPBallR <= 0) {
+      _ballY = kPBallR;
+      _ballVy = _ballVy.abs();
+    } else if (_ballY + kPBallR >= kPFH) {
+      _ballY = kPFH - kPBallR;
+      _ballVy = -_ballVy.abs();
+    }
+
+    // ── Столкновения ракеток (только хост — авторитетный источник) ────────
+    if (widget.isHost) {
       // P1 (хост = левая ракетка)
       final p1X = kPPMrg + kPPadW;
       if (_ballVx < 0 &&
@@ -528,27 +599,27 @@ class _PongOnlineGameState extends State<PongOnlineGame>
           _ballX - kPBallR >= kPPMrg - 2 &&
           (_ballY - _myY).abs() < kPPadH / 2 + kPBallR) {
         _hitCount++;
-        final relY = (_ballY - _myY) / (kPPadH / 2);
+        final relY  = (_ballY - _myY) / (kPPadH / 2);
         final speed = min(kPInit + _hitCount * kPAccel, kPMax);
         _ballVx = cos(relY * (pi / 3)) * speed;
         _ballVy = sin(relY * (pi / 3)) * speed;
-        _ballX = p1X + kPBallR + 1;
+        _ballX  = p1X + kPBallR + 1;
         HapticFeedback.lightImpact();
       }
 
-      // P2 (гость = правая ракетка) — хост считает за гостя по _oppY
+      // P2 (гость = правая ракетка) — хост использует интерполированный _oppY
       final p2X = kPFW - kPPMrg - kPPadW;
       if (_ballVx > 0 &&
           _ballX + kPBallR >= p2X &&
           _ballX + kPBallR <= kPFW - kPPMrg + 2 &&
           (_ballY - _oppY).abs() < kPPadH / 2 + kPBallR) {
         _hitCount++;
-        final relY = (_ballY - _oppY) / (kPPadH / 2);
+        final relY  = (_ballY - _oppY) / (kPPadH / 2);
         final speed = min(kPInit + _hitCount * kPAccel, kPMax);
         final angle = pi - relY * (pi / 3);
         _ballVx = cos(angle) * speed;
         _ballVy = sin(angle) * speed;
-        _ballX = p2X - kPBallR - 1;
+        _ballX  = p2X - kPBallR - 1;
       }
 
       // Очко
@@ -571,9 +642,39 @@ class _PongOnlineGameState extends State<PongOnlineGame>
           });
         }
       }
+    } else {
+      // Гость тоже проверяет столкновения локально для визуала
+      // (но не публикует очки — это делает хост)
+      final p1X = kPPMrg + kPPadW;
+      if (_ballVx < 0 &&
+          _ballX - kPBallR <= p1X &&
+          _ballX - kPBallR >= kPPMrg - 2 &&
+          (_ballY - _oppY).abs() < kPPadH / 2 + kPBallR) {
+        _hitCount++;
+        final relY  = (_ballY - _oppY) / (kPPadH / 2);
+        final speed = min(kPInit + _hitCount * kPAccel, kPMax);
+        _ballVx = cos(relY * (pi / 3)) * speed;
+        _ballVy = sin(relY * (pi / 3)) * speed;
+        _ballX  = p1X + kPBallR + 1;
+      }
+
+      final p2X = kPFW - kPPMrg - kPPadW;
+      if (_ballVx > 0 &&
+          _ballX + kPBallR >= p2X &&
+          _ballX + kPBallR <= kPFW - kPPMrg + 2 &&
+          (_ballY - _myY).abs() < kPPadH / 2 + kPBallR) {
+        _hitCount++;
+        final relY  = (_ballY - _myY) / (kPPadH / 2);
+        final speed = min(kPInit + _hitCount * kPAccel, kPMax);
+        final angle = pi - relY * (pi / 3);
+        _ballVx = cos(angle) * speed;
+        _ballVy = sin(angle) * speed;
+        _ballX  = p2X - kPBallR - 1;
+        HapticFeedback.lightImpact();
+      }
     }
 
-    // Обновляем данные для painter напрямую
+    // ── Обновляем painter ─────────────────────────────────────────────────
     _paintBallX = _ballX;
     _paintBallY = _ballY;
     _paintP1Y   = widget.isHost ? _myY  : _oppY;
@@ -588,12 +689,15 @@ class _PongOnlineGameState extends State<PongOnlineGame>
   void _startSync() {
     _syncTimer?.cancel();
     _syncTimer = Timer.periodic(Duration(milliseconds: kPSync), (_) {
-      if (!mounted) return;
+      if (!mounted || !_playing) return;
       final key = widget.isHost ? 'p1_y' : 'p2_y';
       final update = <String, dynamic>{key: _myY};
       if (widget.isHost) {
-        update['ball_x'] = _ballX;
-        update['ball_y'] = _ballY;
+        // Хост также публикует скорость мяча чтобы гость мог предсказывать
+        update['ball_x']  = _ballX;
+        update['ball_y']  = _ballY;
+        update['ball_vx'] = _ballVx;
+        update['ball_vy'] = _ballVy;
       }
       _db.collection('pong_rooms').doc(widget.roomId).update(update);
     });
