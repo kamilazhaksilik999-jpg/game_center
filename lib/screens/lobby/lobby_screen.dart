@@ -113,7 +113,7 @@ class LobbyScreen extends StatelessWidget {
             // ── Карточки игр ───────────────────────────────────────────
             _gameCard(context, "🚀 Танки",          Colors.teal,             [Color(0xFF0D9488), Color(0xFF134E4A)], "tank"),
             const SizedBox(height: 10),
-            _gameCard(context, "⚽ Футбол",          Colors.green,            [Color(0xFF16A34A), Color(0xFF14532D)], "football"),
+            _gameCard(context, "🏓 Понг",            Colors.purple,           [Color(0xFF7C3AED), Color(0xFF4C1D95)], "football"),
             const SizedBox(height: 10),
             _gameCard(context, "🪢 Перетяни канат",  const Color(0xFFD97706), [Color(0xFFD97706), Color(0xFF78350F)], "tug"),
             const SizedBox(height: 10),
