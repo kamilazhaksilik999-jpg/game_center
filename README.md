@@ -1,17 +1,31 @@
-# game_center
+🎮 Game Center
 
-A new Flutter project.
+**Game Center** — это мобильное приложение, разработанное на Flutter, которое объединяет несколько мини-игр в одном удобном интерфейсе. Проект создан с целью продемонстрировать навыки разработки мобильных приложений, работы в команде и использования системы контроля версий GitHub.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+👥 Команда проекта
 
-A few resources to get you started if this is your first Flutter project:
+* 👩‍💻 **Ажелен** — разработка интерфейса (UI/UX), анимации
+* 👩‍💻 **Камила** — логика игр и функционал приложения
+* 👩‍💻 **Айнура** — работа с GitHub, интеграция и тестирование
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+🚀 Основные возможности
+
+* 🎮 Несколько мини-игр в одном приложении
+* 🌙 Поддержка тёмной темы
+* 🎬 Анимации при переходе между экранами
+* 💾 Сохранение прогресса пользователя
+* 🏆 Таблица лидеров (Leaderboard)
+* 📱 Удобный и современный интерфейс
+
+---
+
+🛠 Используемые технологии
+
+* **Flutter** — для создания кроссплатформенного приложения
+* **Dart** — язык программирования
+* **Git & GitHub** — контроль версий и командная работа
+* **Android Studio** — среда разработки
